@@ -30,7 +30,7 @@ struct Args {
     sample_rate: u32,
 
     /// Render the instruments to stereo wav files. mono is default
-    #[clap(short, long, default_value = "false")]
+    #[clap(long, default_value = "false")]
     stereo: bool,
 
     /// Render each instrument for each channel (if false only a _all file will be generated)
@@ -39,7 +39,7 @@ struct Args {
 
     /// Sample depth for the rendering. Support is "float" and "int16"
     #[clap(short, long, default_value = "int16")]
-    sample_depth: String,
+    format: String,
 }
 
 #[repr(C)]
@@ -165,7 +165,7 @@ fn gen_song(
 ) {
     let sample_rate = args.sample_rate as usize;
     // Number of bytes needed given a sample depth
-    let bytes_per_sample = if args.sample_depth == "float" { 4 } else { 2 };
+    let bytes_per_sample = if args.format == "float" { 4 } else { 2 };
     // Number of bytes needed given a sample depth
     let channel_count = if args.stereo { 2 } else { 1 };
     // We add 1 sec extra to the duration to make sure the buffer is large enough
