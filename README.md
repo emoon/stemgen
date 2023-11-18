@@ -17,7 +17,7 @@ or just run directly from
 
 `target/release/stemgen`
 
-after bulding the release config
+after building the release config
 
 # Usage
 
