@@ -1,0 +1,19 @@
+[package]
+name = "stemgen"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+walkdir = "2"
+cc = { version = "1.0", features = ["parallel"] }
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+filetime = "0.2"
+indicatif = "0.17.0-rc.8"
+log = "0.4"
+rayon = "1.5.1"
+regex = "1.5"
+simple_logger = "2.1.0"
+walkdir = "2"
