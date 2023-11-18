@@ -36,7 +36,9 @@ fn main() {
     build.include("external/libopenmpt/src");
 
     if env.contains("windows") {
-        build.flag("/std:c++latest");
+        build.flag("/std:c++17");
+        build.flag("/EHsc");
+        build.define("UNICODE", None);
     } else if env.contains("darwin") {
         build.flag("-std=c++17");
     } else {
