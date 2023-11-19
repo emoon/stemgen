@@ -70,9 +70,9 @@ uint32_t song_render_c(
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < num_channels; ++i) {
                 if (i == channel_to_play)
-                    interactive->set_channel_mute_status(i, true);
-                else
                     interactive->set_channel_mute_status(i, false);
+                else
+                    interactive->set_channel_mute_status(i, true);
             }
         }
 

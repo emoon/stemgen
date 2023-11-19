@@ -172,11 +172,11 @@ fn gen_song(
     let song_len = (song_info.duration_seconds + 1.0) as usize;
 
     let filename = if channel == -1 {
-        Path::new(&args.output).join(format!("{}_{:04}_chan_full.wav", filestem, instrument))
+        Path::new(&args.output).join(format!("{}_{:04}_chan_full.wav", filestem, instrument + 1))
     } else {
         Path::new(&args.output).join(format!(
             "{}_{:04}_chan_{:04}.wav",
-            filestem, instrument, channel
+            filestem, instrument + 1, channel
         ))
     };
 
