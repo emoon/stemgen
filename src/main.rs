@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
 use std::{fs::File, io::Read, path::Path};
@@ -168,8 +169,8 @@ fn gen_song(
     let bytes_per_sample = if args.format == "float" { 4 } else { 2 };
     // Number of bytes needed given a sample depth
     let channel_count = if args.stereo { 2 } else { 1 };
-    // We add 1 sec extra to the duration to make sure the buffer is large enough
-    let song_len = (song_info.duration_seconds + 1.0) as usize;
+    // We add 5 sec extra to the duration to make sure the buffer is large enough
+    let song_len = (song_info.duration_seconds + 5.0) as usize;
 
     let filename = if channel == -1 {
         Path::new(&args.output).join(format!("{}_{:04}_chan_full.wav", filestem, instrument + 1))
@@ -235,10 +236,21 @@ fn main() -> Result<()> {
             continue;
         }
 
+        let mut pb = None;
+
+        let spinner_style =
+            ProgressStyle::with_template("{prefix:.bold.dim} {wide_bar} {pos}/{len}").unwrap();
+
         if args.channels {
             let channel_count = song_info.channel_count;
             let instrument_count = song_info.instrument_count;
             let total_count = channel_count * instrument_count; 
+
+            if args.progress {
+                let p = ProgressBar::new(total_count as u64);
+                p.set_style(spinner_style);
+                pb = Some(p);
+            }
 
             (0..total_count)
                 .into_par_iter()
@@ -252,9 +264,18 @@ fn main() -> Result<()> {
                         &args,
                         channel as _,
                         instrument as _,
-                    )
+                    );
+
+                    if let Some(p) = &pb {
+                        p.inc(1);
+                    }
                 });
         } else {
+            if args.progress {
+                let p = ProgressBar::new(song_info.instrument_count as u64);
+                p.set_style(spinner_style);
+                pb = Some(p);
+            }
             (0..song_info.instrument_count)
                 .into_par_iter()
                 .for_each(|instrument| {
@@ -265,7 +286,11 @@ fn main() -> Result<()> {
                         &args,
                         -1,
                         instrument as _,
-                    )
+                    );
+
+                    if let Some(p) = &pb {
+                        p.inc(1);
+                    }
                 });
         }
     }
