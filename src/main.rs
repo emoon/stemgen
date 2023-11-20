@@ -22,6 +22,10 @@ struct Args {
     #[clap(short, long)]
     recursive: bool,
 
+    /// Render the whole song as is 
+    #[clap(long, default_value = "false")]
+    full: bool,
+
     /// Show progressbar when generating
     #[clap(short, long, default_value = "false")]
     progress: bool,
@@ -164,6 +168,7 @@ fn gen_song(
     args: &Args,
     channel: i32,
     instrument: i32,
+    stereo: bool,
 ) {
     let sample_rate = args.sample_rate as usize;
     // Number of bytes needed given a sample depth
@@ -173,7 +178,9 @@ fn gen_song(
     // We add 5 sec extra to the duration to make sure the buffer is large enough
     let song_len = (song_info.duration_seconds + 5.0) as usize;
 
-    let filename = if channel == -1 {
+    let filename = if channel == -1 && instrument == -1 {
+        Path::new(&args.output).join(format!("{}.wav", filestem))
+    } else if channel == -1 {
         Path::new(&args.output).join(format!("{}_{:04}_chan_full.wav", filestem, instrument + 1))
     } else {
         Path::new(&args.output).join(format!(
@@ -192,7 +199,7 @@ fn gen_song(
         bytes_per_sample as _,
         channel,
         instrument,
-        args.stereo,
+        stereo
     );
 
     // TODO: Optimize
@@ -243,6 +250,18 @@ fn main() -> Result<()> {
         let spinner_style =
             ProgressStyle::with_template("{prefix:.bold.dim} {wide_bar} {pos}/{len}").unwrap();
 
+        if args.full {
+            gen_song(
+                &stemname,
+                &song_info,
+                &song_buffer,
+                &args,
+                -1,
+                -1,
+                true,
+            );
+        }
+
         if args.channels {
             let channel_count = song_info.channel_count;
             let instrument_count = song_info.instrument_count;
@@ -266,6 +285,7 @@ fn main() -> Result<()> {
                         &args,
                         channel as _,
                         instrument as _,
+                        args.stereo
                     );
 
                     if let Some(p) = &pb {
@@ -288,6 +308,7 @@ fn main() -> Result<()> {
                         &args,
                         -1,
                         instrument as _,
+                        args.stereo
                     );
 
                     if let Some(p) = &pb {
