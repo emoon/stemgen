@@ -43,7 +43,7 @@ uint32_t song_render_c(
     uint8_t* output, uint32_t output_len, 
     const uint8_t* input, uint32_t len, 
     uint32_t sample_rate, 
-    uint32_t bits_per_sample, // 2 for 16 bit, 4 for floats
+    uint32_t bytes_per_sample, // 2 for 16 bit, 4 for floats
     int32_t channel_to_play, // if -1 use all channels, otherwise pick one channel
     int32_t instrument_to_play, // if -1 use all instruments, otherwise pick one
     bool stereo_output) 
@@ -87,7 +87,7 @@ uint32_t song_render_c(
             }
         }
 
-        if (bits_per_sample == 2) {
+        if (bytes_per_sample == 2) {
             for (uint32_t i = 0; i < output_len; i += sample_rate) {
                 uint32_t gen_count = 0;
 
@@ -128,9 +128,9 @@ uint32_t song_render_c(
         }
 
         if (stereo_output)
-            return samples_generated * 2 * bits_per_sample;
+            return samples_generated * 2 * bytes_per_sample;
         else
-            return samples_generated * bits_per_sample;
+            return samples_generated * bytes_per_sample;
     }
     catch (const std::exception& e)
     {
