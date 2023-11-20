@@ -69,7 +69,6 @@ extern "C" {
 fn get_song_info(file_data: &[u8]) -> SongInfo {
     unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32) }
 }
-
 fn song_render_instrument(
     output: &mut [u8],
     input: &[u8],
@@ -77,6 +76,8 @@ fn song_render_instrument(
     bits_per_sample: u32,
     channel_to_use: i32,
     instrument_to_play: i32,
+    stereo_output: bool,
+
 ) -> u32 {
     unsafe {
         song_render_c(
@@ -88,7 +89,7 @@ fn song_render_instrument(
             bits_per_sample,
             channel_to_use,
             instrument_to_play,
-            false,
+            stereo_output,
         )
     }
 }
@@ -191,6 +192,7 @@ fn gen_song(
         bytes_per_sample as _,
         channel,
         instrument,
+        args.stereo,
     );
 
     // TODO: Optimize
