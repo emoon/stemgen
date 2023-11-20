@@ -177,7 +177,7 @@ fn gen_song(
     // Number of bytes needed given a sample depth
     let bytes_per_sample = if args.format == "float" { 4 } else { 2 };
     // Number of bytes needed given a sample depth
-    let channel_count = if args.stereo { 2 } else { 1 };
+    let mut channel_count = if args.stereo { 2 } else { 1 };
 
     let (panning, panning_enabled) = if let Some(panning) = args.panning {
         (panning, true)
@@ -197,7 +197,7 @@ fn gen_song(
 
     let sample_rate = args.sample_rate as usize;
     // We add 5 sec extra to the duration to make sure the buffer is large enough
-    let song_len = (song_info.duration_seconds + 5.0) as usize;
+    let song_len = song_info.duration_seconds as usize;
 
     let filename = if channel == -1 && instrument == -1 {
         Path::new(&args.output).join(format!("{}.wav", filestem))
@@ -210,7 +210,12 @@ fn gen_song(
         ))
     };
 
-    let output_size_bytes = song_len * sample_rate * bytes_per_sample as usize * channel_count;
+    // two channels for full track
+    if channel == -1 && instrument == -1 {
+        channel_count = 2; 
+    }
+
+    let output_size_bytes = song_len * sample_rate * bytes_per_sample as usize * channel_count * 2;
     let mut output_buffer = vec![0u8; output_size_bytes];
 
     let render_len = song_render(&mut output_buffer, song, &render_params);
