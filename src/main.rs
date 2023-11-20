@@ -22,12 +22,16 @@ struct Args {
     #[clap(short, long)]
     recursive: bool,
 
+    /// Panning value of the active channel. Should be in [-1.0, 1.0] where 0.0 is center
+    #[clap(short, long, default_value = None)]
+    panning: Option<f32>,
+
     /// Render the whole song as is 
     #[clap(long, default_value = "false")]
     full: bool,
 
     /// Show progressbar when generating
-    #[clap(short, long, default_value = "false")]
+    #[clap(long, default_value = "false")]
     progress: bool,
 
     /// Output sample rate. Should be in [8000, 192000]
@@ -55,6 +59,18 @@ struct SongInfo {
     duration_seconds: f32,
 }
 
+// Has to match the struct in the C code
+#[repr(C)]
+struct RenderParams {
+    sample_rate: u32,
+    bytes_per_sample: u32,
+    channel_to_play: i32, // if -1 use all channels, otherwise pick one channel
+    instrument_to_play: i32, // if -1 use all instruments, otherwise pick one
+    panning: f32,
+    panning_enabled: bool,
+    stereo_output: bool,
+}
+
 extern "C" {
     fn get_song_info_c(data: *const u8, len: u32) -> SongInfo;
     fn song_render_c(
@@ -62,26 +78,17 @@ extern "C" {
         output_len: u32,
         input_data: *const u8,
         input_len: u32,
-        sample_rate: u32,
-        bits_per_sample: u32,
-        channel_to_play: i32, // if -1 use all channels, otherwise pick one channel
-        instrument_to_play: i32, // if -1 use all instruments, otherwise pick one
-        stereo_output: bool,
+        params: *const RenderParams,
     ) -> u32;
 }
 
 fn get_song_info(file_data: &[u8]) -> SongInfo {
     unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32) }
 }
-fn song_render_instrument(
+fn song_render(
     output: &mut [u8],
     input: &[u8],
-    sample_rate: u32,
-    bits_per_sample: u32,
-    channel_to_use: i32,
-    instrument_to_play: i32,
-    stereo_output: bool,
-
+    render_params: &RenderParams,
 ) -> u32 {
     unsafe {
         song_render_c(
@@ -89,11 +96,7 @@ fn song_render_instrument(
             output.len() as u32,
             input.as_ptr(),
             input.len() as u32,
-            sample_rate,
-            bits_per_sample,
-            channel_to_use,
-            instrument_to_play,
-            stereo_output,
+            render_params,
         )
     }
 }
@@ -169,12 +172,24 @@ fn gen_song(
     channel: i32,
     instrument: i32,
     stereo: bool,
+
 ) {
-    let sample_rate = args.sample_rate as usize;
     // Number of bytes needed given a sample depth
     let bytes_per_sample = if args.format == "float" { 4 } else { 2 };
     // Number of bytes needed given a sample depth
     let channel_count = if args.stereo { 2 } else { 1 };
+
+    let render_params = RenderParams {
+        sample_rate: args.sample_rate as _,
+        bytes_per_sample,
+        channel_to_play: channel,
+        instrument_to_play: instrument,
+        panning: 0.0, //args.panning,
+        panning_enabled: false,
+        stereo_output: stereo,
+    };
+
+    let sample_rate = args.sample_rate as usize;
     // We add 5 sec extra to the duration to make sure the buffer is large enough
     let song_len = (song_info.duration_seconds + 5.0) as usize;
 
@@ -189,18 +204,12 @@ fn gen_song(
         ))
     };
 
-    let output_size_bytes = song_len * sample_rate * bytes_per_sample * channel_count;
+    let output_size_bytes = song_len * sample_rate * bytes_per_sample as usize * channel_count;
     let mut output_buffer = vec![0u8; output_size_bytes];
 
-    song_render_instrument(
-        &mut output_buffer,
-        song,
-        args.sample_rate,
-        bytes_per_sample as _,
-        channel,
-        instrument,
-        stereo
-    );
+    let render_len = song_render(&mut output_buffer, song, &render_params);
+
+    output_buffer.truncate(render_len as _);
 
     // TODO: Optimize
     if output_buffer.iter().any(|x| *x != 0) {
@@ -209,7 +218,7 @@ fn gen_song(
             output_buffer,
             args.sample_rate,
             channel_count,
-            bytes_per_sample,
+            bytes_per_sample as _,
         );
     }
 }

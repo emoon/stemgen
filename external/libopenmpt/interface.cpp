@@ -8,6 +8,17 @@ struct SongInfo {
     float length_seconds;
 };
 
+// Has to match the struct on the Rust size 
+struct RenderParams {
+    uint32_t sample_rate;
+    uint32_t bytes_per_sample;
+    int32_t channel_to_play;
+    int32_t instrument_to_play;
+    float panning;
+    bool panning_enabled;
+    bool stereo_output;
+};
+
 extern "C"
 {
 
@@ -42,11 +53,7 @@ SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len) {
 uint32_t song_render_c(
     uint8_t* output, uint32_t output_len, 
     const uint8_t* input, uint32_t len, 
-    uint32_t sample_rate, 
-    uint32_t bytes_per_sample, // 2 for 16 bit, 4 for floats
-    int32_t channel_to_play, // if -1 use all channels, otherwise pick one channel
-    int32_t instrument_to_play, // if -1 use all instruments, otherwise pick one
-    bool stereo_output) 
+    RenderParams& params)
 {
     try
     {
@@ -55,6 +62,7 @@ uint32_t song_render_c(
         int16_t* output_16bit = (int16_t*)output;
         float* output_float = (float*)output;
         uint32_t samples_generated = 0;
+        uint32_t sample_rate = params.sample_rate;
 
         int num_channels = song.get_num_channels();
         int instrument_count = song.get_num_instruments();
@@ -66,20 +74,20 @@ uint32_t song_render_c(
 
         openmpt::ext::interactive* interactive = static_cast<openmpt::ext::interactive*>(song.get_interface(openmpt::ext::interactive_id));
 
-        if (channel_to_play >= 0 && interactive != nullptr) {
+        if (params.channel_to_play >= 0 && interactive != nullptr) {
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < num_channels; ++i) {
-                if (i == channel_to_play)
+                if (i == params.channel_to_play)
                     interactive->set_channel_mute_status(i, false);
                 else
                     interactive->set_channel_mute_status(i, true);
             }
         }
 
-        if (instrument_to_play >= 0 && interactive) {
+        if (params.instrument_to_play >= 0 && interactive) {
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < instrument_count; ++i) {
-                if (i == instrument_to_play) {
+                if (i == params.instrument_to_play) {
                     interactive->set_instrument_mute_status(i, false);
                 } else {
                     interactive->set_instrument_mute_status(i, true);
@@ -87,17 +95,17 @@ uint32_t song_render_c(
             }
         }
 
-        if (bytes_per_sample == 2) {
+        if (params.bytes_per_sample == 2) {
             for (uint32_t i = 0; i < output_len; i += sample_rate) {
                 uint32_t gen_count = 0;
 
-                if (stereo_output) {
+                if (params.stereo_output) {
                     gen_count = (uint32_t)song.read_interleaved_stereo(sample_rate, sample_rate, output_16bit);
                     output_16bit += sample_rate * 2;
                 }
                 else {
                     gen_count = (uint32_t)song.read(sample_rate, sample_rate, output_16bit);
-                    output_16bit += sample_rate;
+                    output_16bit += params.sample_rate;
                 }
 
                 samples_generated += gen_count;
@@ -110,7 +118,7 @@ uint32_t song_render_c(
             for (uint32_t i = 0; i < output_len; i += sample_rate) {
                 uint32_t gen_count = 0;
 
-                if (stereo_output) {
+                if (params.stereo_output) {
                     gen_count = (uint32_t)song.read_interleaved_stereo(sample_rate, sample_rate, output_float);
                     output_float += sample_rate * 2;
                 }
@@ -127,10 +135,10 @@ uint32_t song_render_c(
             }
         }
 
-        if (stereo_output)
-            return samples_generated * 2 * bytes_per_sample;
+        if (params.stereo_output)
+            return samples_generated * 2 * params.bytes_per_sample;
         else
-            return samples_generated * bytes_per_sample;
+            return samples_generated * params.bytes_per_sample;
     }
     catch (const std::exception& e)
     {
