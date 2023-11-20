@@ -58,6 +58,7 @@ uint32_t song_render_c(
     try
     {
         openmpt::detail::initial_ctls_map ctls;
+        ctls["play.at_end"] = "stop";
         openmpt::module_ext song(input, (size_t)len, std::clog, ctls);
         int16_t* output_16bit = (int16_t*)output;
         float* output_float = (float*)output;
@@ -73,18 +74,23 @@ uint32_t song_render_c(
         }
 
         openmpt::ext::interactive* interactive = static_cast<openmpt::ext::interactive*>(song.get_interface(openmpt::ext::interactive_id));
+        openmpt::ext::interactive2* interactive2 = static_cast<openmpt::ext::interactive2*>(song.get_interface(openmpt::ext::interactive2_id));
 
         if (params.channel_to_play >= 0 && interactive != nullptr) {
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < num_channels; ++i) {
-                if (i == params.channel_to_play)
+                if (i == params.channel_to_play) {
+                    if (params.panning_enabled) {
+                        interactive2->set_channel_panning(i, params.panning);
+                    }
                     interactive->set_channel_mute_status(i, false);
-                else
+                } else { 
                     interactive->set_channel_mute_status(i, true);
+                }
             }
         }
 
-        if (params.instrument_to_play >= 0 && interactive) {
+        if (params.instrument_to_play >= 0 && interactive && interactive2) {
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < instrument_count; ++i) {
                 if (i == params.instrument_to_play) {

@@ -179,13 +179,19 @@ fn gen_song(
     // Number of bytes needed given a sample depth
     let channel_count = if args.stereo { 2 } else { 1 };
 
+    let (panning, panning_enabled) = if let Some(panning) = args.panning {
+        (panning, true)
+    } else {
+        (0.0, false)
+    };
+
     let render_params = RenderParams {
         sample_rate: args.sample_rate as _,
         bytes_per_sample,
         channel_to_play: channel,
         instrument_to_play: instrument,
-        panning: 0.0, //args.panning,
-        panning_enabled: false,
+        panning,
+        panning_enabled,
         stereo_output: stereo,
     };
 
