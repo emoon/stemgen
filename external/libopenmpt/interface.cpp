@@ -14,8 +14,8 @@ struct RenderParams {
     uint32_t bytes_per_sample;
     int32_t channel_to_play;
     int32_t instrument_to_play;
-    float panning;
-    bool panning_enabled;
+    int stereo_separation;
+    bool stereo_separation_enabled;
     bool stereo_output;
 };
 
@@ -73,6 +73,10 @@ uint32_t song_render_c(
             instrument_count = song.get_num_samples();
         }
 
+        if (params.stereo_separation_enabled) {
+            song.set_render_param(openmpt::module::RENDER_STEREOSEPARATION_PERCENT, params.stereo_separation);
+        }
+
         openmpt::ext::interactive* interactive = static_cast<openmpt::ext::interactive*>(song.get_interface(openmpt::ext::interactive_id));
         openmpt::ext::interactive2* interactive2 = static_cast<openmpt::ext::interactive2*>(song.get_interface(openmpt::ext::interactive2_id));
 
@@ -80,9 +84,6 @@ uint32_t song_render_c(
             // Deactivate all channels execpt the one we care about
             for (int i = 0; i < num_channels; ++i) {
                 if (i == params.channel_to_play) {
-                    if (params.panning_enabled) {
-                        interactive2->set_channel_panning(i, params.panning);
-                    }
                     interactive->set_channel_mute_status(i, false);
                 } else { 
                     interactive->set_channel_mute_status(i, true);
