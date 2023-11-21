@@ -9,9 +9,10 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 anyhow = "1.0"
+flacenc = { version = "0.3.1" }
 clap = { version = "4.4", features = ["derive"] }
-filetime = "0.2"
 indicatif = "0.17.0-rc.8"
+bytemuck = "1.14.0"
 log = "0.4"
 rayon = "1.5.1"
 simple_logger = "2.1.0"

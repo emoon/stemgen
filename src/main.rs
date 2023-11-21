@@ -3,8 +3,9 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path, path::PathBuf};
 use walkdir::WalkDir;
+use flacenc::component::BitRepr;
 use wav;
 
 #[derive(Parser, Debug)]
@@ -46,9 +47,13 @@ struct Args {
     #[clap(short, long, default_value = "false")]
     channels: bool,
 
-    /// Sample depth for the rendering. Support is "float" and "int16"
+    /// Sample depth for the rendering. Support are "float" and "int16"
     #[clap(short, long, default_value = "int16")]
     format: String,
+
+    /// Write format for the rendering. Support are "flac" and "wav" 
+    #[clap(short, long, default_value = "flac")]
+    write: String,
 }
 
 #[repr(C)]
@@ -138,6 +143,42 @@ fn get_files(path: &str, recurse: bool) -> Vec<String> {
     files
 }
 
+fn write_flac_file(
+    filename: &Path,
+    buffer: Vec<u8>,
+    sample_rate: u32,
+    channel_count: usize,
+    bytes_per_sample: usize,
+) {
+    let filename = PathBuf::from(filename).with_extension("flac"); 
+
+    let bits_per_sample = if bytes_per_sample == 4 { 24 } else { 16 };
+
+    let samples = if bytes_per_sample == 4 {
+        let data: &[f32] = bytemuck::cast_slice(&buffer);
+        data.iter().map(|x| (*x * (1 << (bits_per_sample - 1)) as f32) as i32).collect::<Vec<i32>>()
+    } else {
+        let data: &[i16] = bytemuck::cast_slice(&buffer);
+        data.iter().map(|x| (*x as i32)).collect::<Vec<i32>>()
+    };
+
+    let config = flacenc::config::Encoder::default();
+    let source = flacenc::source::MemSource::from_samples(
+        &samples, channel_count as _, bits_per_sample, sample_rate as _);
+
+    let flac_stream = flacenc::encode_with_fixed_block_size(
+        &config, source, config.block_sizes[0]
+    ).expect("Encode failed.");
+
+    // `Stream` imlpements `BitRepr` so you can obtain the encoded stream via
+    // `ByteSink` struct that implements `BitSink`.
+    let mut sink = flacenc::bitsink::ByteSink::new();
+    flac_stream.write(&mut sink).unwrap();
+
+    // Then, e.g. you can write it to a file.
+    std::fs::write(filename, sink.as_slice()).unwrap()
+}
+
 fn write_wav_file(
     filename: &Path,
     buffer: Vec<u8>,
@@ -145,6 +186,8 @@ fn write_wav_file(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
+    let filename = PathBuf::from(filename).with_extension("wav"); 
+
     let (format, bits) = if bytes_per_sample == 4 {
         (wav::header::WAV_FORMAT_IEEE_FLOAT, 32)
     } else {
@@ -185,6 +228,14 @@ fn gen_song(
         (0.0, false)
     };
 
+    let mut stereo = stereo;    
+
+    // two channels for full track
+    if channel == -1 && instrument == -1 {
+        channel_count = 2; 
+        stereo = true;
+    }
+
     let render_params = RenderParams {
         sample_rate: args.sample_rate as _,
         bytes_per_sample,
@@ -200,12 +251,12 @@ fn gen_song(
     let song_len = song_info.duration_seconds as usize;
 
     let filename = if channel == -1 && instrument == -1 {
-        Path::new(&args.output).join(format!("{}.wav", filestem))
+        Path::new(&args.output).join(format!("{}", filestem))
     } else if channel == -1 {
-        Path::new(&args.output).join(format!("{}_{:04}_chan_full.wav", filestem, instrument + 1))
+        Path::new(&args.output).join(format!("{}_{:04}_chan_full", filestem, instrument + 1))
     } else {
         Path::new(&args.output).join(format!(
-            "{}_{:04}_chan_{:04}.wav",
+            "{}_{:04}_chan_{:04}",
             filestem, instrument + 1, channel
         ))
     };
@@ -224,20 +275,30 @@ fn gen_song(
 
     // TODO: Optimize
     if output_buffer.iter().any(|x| *x != 0) {
-        write_wav_file(
-            &filename,
-            output_buffer,
-            args.sample_rate,
-            channel_count,
-            bytes_per_sample as _,
-        );
+        if args.write == "flac" {
+            write_flac_file(
+                &filename,
+                output_buffer,
+                args.sample_rate,
+                channel_count,
+                bytes_per_sample as _,
+            );
+        } else {
+            write_wav_file(
+                &filename,
+                output_buffer,
+                args.sample_rate,
+                channel_count,
+                bytes_per_sample as _,
+            );
+        }
     }
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
     SimpleLogger::new()
-        .with_level(log::LevelFilter::Info)
+        .with_level(log::LevelFilter::Error)
         .init()?;
 
     let files = get_files(&args.input, args.recursive);
@@ -250,7 +311,7 @@ fn main() -> Result<()> {
         let song_info = get_song_info(&song_buffer);
         let stemname = file_path.file_stem().unwrap().to_str().unwrap();
 
-        log::info!("Processing file {}", filename);
+        println!("Processing file {}", filename);
 
         if song_info.channel_count == 0 || song_info.instrument_count == 0 {
             log::error!(
@@ -265,11 +326,6 @@ fn main() -> Result<()> {
             continue;
         }
 
-        let mut pb = None;
-
-        let spinner_style =
-            ProgressStyle::with_template("{prefix:.bold.dim} {wide_bar} {pos}/{len}").unwrap();
-
         if args.full {
             gen_song(
                 &stemname,
@@ -281,6 +337,11 @@ fn main() -> Result<()> {
                 true,
             );
         }
+
+        let mut pb = None;
+
+        let spinner_style =
+            ProgressStyle::with_template("{prefix:.bold.dim} {wide_bar} {pos}/{len}").unwrap();
 
         if args.channels {
             let channel_count = song_info.channel_count;
