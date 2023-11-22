@@ -47,6 +47,10 @@ struct Args {
     #[clap(short, long, default_value = "false")]
     channels: bool,
 
+    /// Render each instrument to a separate file
+    #[clap(long, default_value = "false")]
+    instruments: bool,
+
     /// Sample depth for the rendering. Supported are "float" and "int16"
     #[clap(short, long, default_value = "int16")]
     format: String,
@@ -373,7 +377,7 @@ fn main() -> Result<()> {
                         p.inc(1);
                     }
                 });
-        } else {
+        } else if args.instruments {
             if args.progress {
                 let p = ProgressBar::new(song_info.instrument_count as u64);
                 p.set_style(spinner_style);
