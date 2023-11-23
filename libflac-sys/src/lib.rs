@@ -34,7 +34,7 @@ pub fn encode_flac(filename: &Path, buffer: &[u8], channels: u32, bytes_per_samp
         let  encoder = FLAC__stream_encoder_new();
 
         FLAC__stream_encoder_set_verify(encoder, 1);
-        FLAC__stream_encoder_set_compression_level(encoder, 5); // Compression level 5 is a good balance
+        FLAC__stream_encoder_set_compression_level(encoder, 8); // Max compression 
 
         FLAC__stream_encoder_set_channels(encoder, channels);
         FLAC__stream_encoder_set_bits_per_sample(encoder, bits_per_sample);
