@@ -564,6 +564,9 @@ bool CSoundFile::SaveFLACSample(SAMPLEINDEX nSample, std::ostream &f) const
 	if(sample.uFlags[CHN_ADLIB])
 		return false;
 
+	if (sample.GetElementarySampleSize() == 0)
+        return true;
+
 	FLAC__StreamEncoder_RAII encoder(f);
 	if(encoder == nullptr)
 		return false;
