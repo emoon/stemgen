@@ -22,7 +22,7 @@ after building the release config
 # Usage
 
 ```
-Usage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
+sage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
 
 Options:
   -i, --input <INPUT>
@@ -43,6 +43,10 @@ Options:
           Render the instruments to stereo wav files. mono is default
   -c, --channels
           Render each instrument for each channel (if false only a _all file will be generated)
+      --instruments
+          Render each instrument to a separate file
+      --samples
+          Write samples in the song to disk (best effort)
   -f, --format <FORMAT>
           Sample depth for the rendering. Supported are "float" and "int16" [default: int16]
   -w, --write <WRITE>
