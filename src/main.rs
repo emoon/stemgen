@@ -51,6 +51,10 @@ struct Args {
     #[clap(long, default_value = "false")]
     instruments: bool,
 
+    /// Write samples in the song to disk (best effort) 
+    #[clap(long, default_value = "false")]
+    samples: bool,
+
     /// Sample depth for the rendering. Supported are "float" and "int16"
     #[clap(short, long, default_value = "int16")]
     format: String,
@@ -81,7 +85,7 @@ struct RenderParams {
 }
 
 extern "C" {
-    fn get_song_info_c(data: *const u8, len: u32) -> SongInfo;
+    fn get_song_info_c(data: *const u8, len: u32, sample_output_path: *const u8) -> SongInfo;
     fn song_render_c(
         output: *mut u8,
         output_len: u32,
@@ -91,8 +95,14 @@ extern "C" {
     ) -> u32;
 }
 
-fn get_song_info(file_data: &[u8]) -> SongInfo {
-    unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32) }
+fn get_song_info(file_data: &[u8], samples_output_path: Option<&Path>) -> SongInfo {
+    if let Some(path) = samples_output_path {
+        let os_path = path.to_string_lossy().into_owned();
+        let c_filename = std::ffi::CString::new(os_path).unwrap();
+        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, c_filename.as_ptr() as *const _) }
+    } else {
+        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, std::ptr::null()) }
+    }
 }
 fn song_render(
     output: &mut [u8],
@@ -321,10 +331,17 @@ fn main() -> Result<()> {
         let mut file = File::open(&filename)?;
         let mut song_buffer = Vec::new();
         file.read_to_end(&mut song_buffer)?;
-        let song_info = get_song_info(&song_buffer);
+        
         let stemname = file_path.file_stem().unwrap().to_str().unwrap();
 
         println!("Processing file {}", filename);
+
+        let song_info = if args.samples {
+            let sample_path = Path::new(&args.output).join(format!("{}", stemname));
+            get_song_info(&song_buffer, Some(&sample_path))
+        } else {
+            get_song_info(&song_buffer, None) 
+        };
 
         if song_info.channel_count == 0 || song_info.instrument_count == 0 {
             log::error!(

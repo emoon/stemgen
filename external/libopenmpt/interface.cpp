@@ -1,6 +1,11 @@
 #include <libopenmpt/libopenmpt.hpp>
 #include <libopenmpt/libopenmpt_ext.hpp>
+#include <stdafx.h>
+#include <soundlib/Sndfile.h>
 #include <stdint.h>
+#include <iostream>
+#include <fstream>
+
 
 struct SongInfo {
     int num_channels;
@@ -22,7 +27,7 @@ struct RenderParams {
 extern "C"
 {
 
-SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len) {
+SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len, const char* sample_output_path) {
     SongInfo info = { 0, 0, 0.0f };
 
     try
@@ -42,6 +47,20 @@ SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len) {
         }
 
         info.length_seconds = (float)song.get_duration_seconds();
+
+        if (sample_output_path) {
+            OpenMPT::CSoundFile* sf = song.get_snd_file();
+
+            int num_samples = sf->GetNumSamples();
+
+            for (int i = 1; i < num_samples + 1; ++i) {
+                char name[4096];
+                sprintf(name, "%s_sample_%04d.wav", sample_output_path, i);
+                std::ofstream f(name, std::ios::binary );
+                sf->SaveWAVSample(i, f);
+            }
+        }
+
     }
     catch (const std::exception&)
     {
@@ -141,6 +160,9 @@ uint32_t song_render_c(
                     break;
             }
         }
+
+	    //bool SaveSFZInstrument(INSTRUMENTINDEX nInstr, std::ostream &f, const mpt::PathString &filename, bool useFLACsamples) const;
+
 
         if (params.stereo_output)
             return samples_generated * 2 * params.bytes_per_sample;

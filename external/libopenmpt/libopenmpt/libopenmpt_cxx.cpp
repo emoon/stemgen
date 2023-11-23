@@ -431,6 +431,10 @@ std::string module::ctl_get_text( std::string_view ctl ) const {
 	return impl->ctl_get_text( ctl );
 }
 
+OpenMPT::CSoundFile* module::get_snd_file() {
+    return impl->get_snd_file();
+}
+
 void module::ctl_set( const std::string & ctl, const std::string & value ) {
 	impl->ctl_set( ctl, value );
 }
@@ -503,5 +507,6 @@ void module_ext::operator = ( const module_ext & ) {
 void * module_ext::get_interface( const std::string & interface_id ) {
 	return ext_impl->get_interface( interface_id );
 }
+
 
 } // namespace openmpt

@@ -149,7 +149,7 @@
 #if defined(LIBOPENMPT_BUILD_TEST)
 #define ENABLE_TESTS
 #else
-#define MODPLUG_NO_FILESAVE
+//#define MODPLUG_NO_FILESAVE
 #endif
 #if defined(MPT_BUILD_ANALZYED) || defined(MPT_BUILD_DEBUG) || defined(MPT_BUILD_CHECKED) || defined(ENABLE_TESTS)
 // enable asserts
