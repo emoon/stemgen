@@ -4,7 +4,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
 use std::{fs::File, io::Read, path::Path, path::PathBuf};
-use vorbis_rs::VorbisEncoderBuilder;
+use vorbis_rs::{VorbisEncoderBuilder, VorbisBitrateManagementStrategy};
 use walkdir::WalkDir;
 use wav;
 
@@ -28,6 +28,15 @@ enum WriteFormat {
 enum SampleDepth {
     Int16,
     Float,
+}
+
+#[repr(C)]
+#[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
+enum OggMode {
+    Vbr,
+    QualityVbr,
+    Abr,
+    ConstrainedAbr,
 }
 
 #[derive(Parser, Debug)]
@@ -84,6 +93,18 @@ struct Args {
     /// Write format for the rendering.
     #[clap(short, long, default_value = "flac")]
     write: WriteFormat,
+
+    /// Mode for the ogg vorbis encoding. 
+    #[clap(long, default_value = "quality-vbr")]
+    vorbis_mode: OggMode,
+
+    /// Bitrate option for vbr, abr, quality-vbr and constrained-abr 
+    #[clap(long, default_value = "80")]
+    vorbis_bitrate: u32,
+
+    /// Quality option for quality-vbr range is [-0.2, 1]
+    #[clap(long, default_value = "0.5")]
+    vorbis_quality: f32,
 }
 
 #[repr(C)]
@@ -239,11 +260,21 @@ fn write_ogg_vorbis(
         }
     };
 
+    let br = core::num::NonZeroU32::new(args.vorbis_bitrate as _).unwrap();
+    let target_quality = f32::clamp(args.vorbis_quality, -0.2, 1.0);
+
+    let bitrate_mode = match args.vorbis_mode {
+        OggMode::Vbr => VorbisBitrateManagementStrategy::Vbr { target_bitrate: br },
+        OggMode::Abr => VorbisBitrateManagementStrategy::Abr { average_bitrate: br },
+        OggMode::ConstrainedAbr => VorbisBitrateManagementStrategy::ConstrainedAbr { maximum_bitrate: br },
+        OggMode::QualityVbr => VorbisBitrateManagementStrategy::QualityVbr { target_quality },
+    };
+
     let mut encoder = VorbisEncoderBuilder::new(
         core::num::NonZeroU32::new(args.sample_rate as _).unwrap(),
         core::num::NonZeroU8::new(channel_count as _).unwrap(),
         &mut out_file,
-    ).unwrap().build().unwrap();
+    ).unwrap().bitrate_management_strategy(bitrate_mode).build().unwrap();
 
     if channel_count == 1 {
         let data: &[f32] = bytemuck::cast_slice(&buffer);
