@@ -4,6 +4,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
 use std::{fs::File, io::Read, path::Path, path::PathBuf};
+use vorbis_rs::VorbisEncoderBuilder;
 use walkdir::WalkDir;
 use wav;
 
@@ -19,7 +20,7 @@ enum SampleOutputFormat {
 enum WriteFormat {
     Flac,
     Wav,
-    //Mp3
+    Vorbis,
 }
 
 #[repr(C)]
@@ -223,6 +224,92 @@ fn write_wav_file(
     wav::write(wav_header, &buffer.into(), &mut out_file).unwrap();
 }
 
+fn write_ogg_vorbis(
+    filename: &Path,
+    buffer: Vec<u8>,
+    args: &Args,
+    channel_count: usize,
+) {
+    let filename = PathBuf::from(filename).with_extension("ogg"); 
+    let mut out_file = match File::create(&filename) {
+        Ok(f) => f,
+        Err(e) => {
+            log::error!("Unable to write to {:?} error: {:?}", filename, e);
+            return;
+        }
+    };
+
+    let mut encoder = VorbisEncoderBuilder::new(
+        core::num::NonZeroU32::new(args.sample_rate as _).unwrap(),
+        core::num::NonZeroU8::new(channel_count as _).unwrap(),
+        &mut out_file,
+    ).unwrap().build().unwrap();
+
+    if channel_count == 1 {
+        let data: &[f32] = bytemuck::cast_slice(&buffer);
+
+        let sample_step = 48000;
+        let len = data.len();
+        let mut offset = 0;
+
+        loop {
+            let step_value = std::cmp::min(sample_step, len - offset);
+
+            let t = [&data[offset..offset + step_value]];
+
+            match encoder.encode_audio_block(&t) {
+                Ok(_) => (),
+                Err(e) => {
+                    log::error!("Unable to encode vorbis file: {:?}", e);
+                    return;
+                }
+            }
+
+            if step_value != sample_step {
+                break;
+            }
+
+            offset += step_value;
+        }
+    } else {
+        let data: &[f32] = bytemuck::cast_slice(&buffer);
+        let channel0: Vec<f32> = data.iter().skip(0).step_by(2).copied().collect();
+        let channel1: Vec<f32> = data.iter().skip(1).step_by(2).copied().collect();
+
+        let sample_step = 48000;
+        let len = channel0.len();
+        let mut offset = 0;
+
+        loop {
+            let step_value = std::cmp::min(sample_step, len - offset);
+
+            let t = [&channel0[offset..offset + step_value], &channel1[offset.. offset + step_value]];
+
+            match encoder.encode_audio_block(&t) {
+                Ok(_) => (),
+                Err(e) => {
+                    log::error!("Unable to encode vorbis file: {:?}", e);
+                    return;
+                }
+            }
+
+            if step_value != sample_step {
+                break;
+            }
+
+            offset += step_value;
+        }
+    }
+
+    match encoder.finish() {
+        Ok(_) => (),
+        Err(e) => {
+            log::error!("Unable to finish vorbis file: {:?}", e);
+            return;
+        }
+    }
+}
+
 fn gen_song(
     filestem: &str,
     song_info: &SongInfo,
@@ -291,22 +378,33 @@ fn gen_song(
 
     // TODO: Optimize
     if output_buffer.iter().any(|x| *x != 0) {
-        if args.write == WriteFormat::Flac {
-            write_flac_file(
-                &filename,
-                output_buffer,
-                args.sample_rate,
-                channel_count,
-                bytes_per_sample as _,
-            );
-        } else {
-            write_wav_file(
-                &filename,
-                output_buffer,
-                args.sample_rate,
-                channel_count,
-                bytes_per_sample as _,
-            );
+        match args.write {
+            WriteFormat::Flac => {
+                write_flac_file(
+                    &filename,
+                    output_buffer,
+                    args.sample_rate,
+                    channel_count,
+                    bytes_per_sample as _,
+                );
+            }
+            WriteFormat::Wav => {
+                write_wav_file(
+                    &filename,
+                    output_buffer,
+                    args.sample_rate,
+                    channel_count,
+                    bytes_per_sample as _,
+                );
+            }
+            WriteFormat::Vorbis => {
+                write_ogg_vorbis(
+                    &filename,
+                    output_buffer,
+                    &args,
+                    channel_count,
+                );
+            }
         }
     }
 }
