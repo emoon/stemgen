@@ -5,7 +5,7 @@ STEM generator using libopenmpt with glue in Rust
 # Building
 
 Download Rust by following the instructions here https://rustup.rs
-Notice that a C++ toolchain needs to be installed as well. On Windows this means Visual Studo 2019 or later and on Linux or macOS clang or gcc.
+Notice that a C++ toolchain needs to be installed along with Cmake as well. On Windows this means Visual Studo 2019 or later and on Linux or macOS clang or gcc.
 
 `cargo build --release`
 
