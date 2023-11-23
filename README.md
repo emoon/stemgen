@@ -50,7 +50,13 @@ Options:
   -f, --format <FORMAT>
           Sample depth for the rendering [default: int16] [possible values: int16, float]
   -w, --write <WRITE>
-          Write format for the rendering [default: flac] [possible values: flac, wav]
+          Write format for the rendering [default: flac] [possible values: flac, wav, vorbis]
+      --vorbis-mode <VORBIS_MODE>
+          Mode for the ogg vorbis encoding [default: vbr] [possible values: vbr, quality-vbr, abr, constrained-abr]
+      --vorbis-bitrate <VORBIS_BITRATE>
+          Bitrate option for vbr, abr, quality-vbr and constrained-abr [default: 160]
+      --vorbis-quality <VORBIS_QUALITY>
+          Quality option for quality-vbr range is [-0.2, 1] [default: 0.5]
   -h, --help
           Print help
   -V, --version
