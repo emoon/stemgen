@@ -95,11 +95,11 @@ struct Args {
     write: WriteFormat,
 
     /// Mode for the ogg vorbis encoding. 
-    #[clap(long, default_value = "quality-vbr")]
+    #[clap(long, default_value = "vbr")]
     vorbis_mode: OggMode,
 
     /// Bitrate option for vbr, abr, quality-vbr and constrained-abr 
-    #[clap(long, default_value = "80")]
+    #[clap(long, default_value = "160")]
     vorbis_bitrate: u32,
 
     /// Quality option for quality-vbr range is [-0.2, 1]
@@ -260,7 +260,7 @@ fn write_ogg_vorbis(
         }
     };
 
-    let br = core::num::NonZeroU32::new(args.vorbis_bitrate as _).unwrap();
+    let br = core::num::NonZeroU32::new((args.vorbis_bitrate * 1000) as _).unwrap();
     let target_quality = f32::clamp(args.vorbis_quality, -0.2, 1.0);
 
     let bitrate_mode = match args.vorbis_mode {
@@ -269,6 +269,8 @@ fn write_ogg_vorbis(
         OggMode::ConstrainedAbr => VorbisBitrateManagementStrategy::ConstrainedAbr { maximum_bitrate: br },
         OggMode::QualityVbr => VorbisBitrateManagementStrategy::QualityVbr { target_quality },
     };
+
+    dbg!(bitrate_mode);
 
     let mut encoder = VorbisEncoderBuilder::new(
         core::num::NonZeroU32::new(args.sample_rate as _).unwrap(),
@@ -441,12 +443,17 @@ fn gen_song(
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
     SimpleLogger::new()
         .with_level(log::LevelFilter::Error)
         .init()?;
 
     let files = get_files(&args.input, args.recursive);
+
+    // Force float if writing vorbis
+    if args.write == WriteFormat::Vorbis {
+        args.format = SampleDepth::Float;
+    }
 
     for filename in files {
         let file_path = Path::new(&filename);
