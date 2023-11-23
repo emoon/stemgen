@@ -66,6 +66,13 @@ SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len, const char* output
 
         for (int i = 1; i < num_samples + 1; ++i) {
             char name[4096];
+
+            // Skip zero sized samples
+	        const auto& sample = sf->GetSample(i);
+
+            if (sample.nLength == 0)
+                continue;
+
             if (sample_format == SampleFormat_Flac) {
                 sprintf(name, "%s_sample_%04d.flac", output_with_stem, i);
                 std::ofstream f(name, std::ios::binary);
