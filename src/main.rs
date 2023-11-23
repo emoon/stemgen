@@ -76,10 +76,6 @@ struct Args {
     #[clap(long)]
     song_samples: Option<SampleOutputFormat>,
 
-    /// Write the individual instruments to disk using SDZ metadata and accompaning samples
-    //#[clap(long)]
-    //song_instruments: Option<SampleOutputFormat>,
-
     /// Sample depth for the rendering.
     #[clap(short, long, default_value = "int16")]
     format: SampleDepth,

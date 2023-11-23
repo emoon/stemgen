@@ -22,7 +22,7 @@ after building the release config
 # Usage
 
 ```
-sage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
+Usage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
 
 Options:
   -i, --input <INPUT>
@@ -48,7 +48,7 @@ Options:
       --song-samples <SONG_SAMPLES>
           Write samples in the song to disk [possible values: flac, wav]
   -f, --format <FORMAT>
-          Write the individual instruments to disk using SDZ metadata and accompaning samples Sample depth for the rendering [default: int16] [possible values: int16, float]
+          Sample depth for the rendering [default: int16] [possible values: int16, float]
   -w, --write <WRITE>
           Write format for the rendering [default: flac] [possible values: flac, wav]
   -h, --help
