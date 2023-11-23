@@ -1,0 +1,64 @@
+[package]
+name = "libflac-sys"
+version = "0.3.0"
+authors = ["Matthias Geier <Matthias.Geier@gmail.com>"]
+categories = ["multimedia::encoding", "external-ffi-bindings"]
+keywords = ["flac"]
+description = "Raw FFI bindings to the libFLAC library"
+readme = "README.md"
+license = "BSD-3-Clause"
+repository = "https://github.com/mgeier/libflac-sys"
+edition = "2018"
+
+links = "FLAC"
+
+exclude = [
+    ".*",
+    "Makefile*",
+    "autogen.sh",
+    "*.m4",
+    "*.sln",
+    "*.sgml",
+    "*.vcproj",
+    "*.vcxproj*",
+    "/flac/configure.ac",
+    "/flac/strip_non_asm_libtool_args.sh",
+    "/flac/test/",
+    "/flac/src/utils/loudness/",
+    "/flac/src/utils/flacdiff/",
+    "/flac/src/utils/flactimer/",
+    "/flac/src/test*/",
+    "/flac/src/plugin*/",
+    "/flac/src/libFLAC++/",
+    "/flac/include/FLAC++/",
+    "/flac/include/share/grabbag.h",
+    "/flac/include/share/grabbag/",
+    "/flac/include/test_libs_common/",
+    "/flac/man/",
+    "/flac/examples/",
+    "/flac/doc/isoflac.txt",
+    "/flac/doc/[Dd]oxy*",
+    "/flac/doc/html/",
+    "/flac/ci/",
+    "/flac/build/",
+    "/flac/Scripts/",
+    "/ogg/appveyor.yml",
+    "/ogg/doc/",
+    "/ogg/releases.sha2",
+    "/ogg/test/",
+    "/ogg/win32/",
+]
+
+[features]
+default = ["build-flac", "build-ogg"]
+build-flac = ["cmake"]
+build-ogg = ["build-flac"]
+
+[build-dependencies]
+# 0.1.45 adds cmake::Config::get_profile()
+cmake = {version = "0.1.45", optional = true}
+
+[dependencies]
+bytemuck = "1.14.0"
+cfixed-string = "1.0"
+libc = "0.2"

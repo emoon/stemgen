@@ -9,7 +9,7 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 anyhow = "1.0"
-# flacenc = { version = "0.3.1", default-featuers = false }
+libflac-sys = { path = "libflac-sys" }
 flacenc = { git = "https://github.com/yotarok/flacenc-rs", default-featuers = false }
 clap = { version = "4.4", features = ["derive"] }
 indicatif = "0.17.0-rc.8"

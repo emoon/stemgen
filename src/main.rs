@@ -156,6 +156,14 @@ fn write_flac_file(
 ) {
     let filename = PathBuf::from(filename).with_extension("flac"); 
 
+    libflac_sys::encode_flac(
+        &filename, 
+        &buffer, 
+        channel_count as _, 
+        bytes_per_sample as _, 
+        sample_rate as _);  
+
+    /*
     let bits_per_sample = if bytes_per_sample == 4 { 24 } else { 16 };
 
     let samples = if bytes_per_sample == 4 {
@@ -181,6 +189,7 @@ fn write_flac_file(
 
     // Then, e.g. you can write it to a file.
     std::fs::write(filename, sink.as_slice()).unwrap()
+    */
 }
 
 fn write_wav_file(
