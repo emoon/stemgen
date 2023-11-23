@@ -34,6 +34,7 @@ fn main() {
     build.include("external/libopenmpt");
     build.include("external/libopenmpt/common");
     build.include("external/libopenmpt/src");
+    build.include("libflac-sys/flac/include");
 
     if env.contains("windows") {
         build.flag("/std:c++17");
