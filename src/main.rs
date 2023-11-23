@@ -1,21 +1,42 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
 use std::{fs::File, io::Read, path::Path, path::PathBuf};
 use walkdir::WalkDir;
-use flacenc::component::BitRepr;
 use wav;
+
+#[repr(C)]
+#[derive(ValueEnum, Debug, Copy, Clone)]
+enum SampleOutputFormat {
+    Flac,
+    Wav,
+}
+
+#[repr(C)]
+#[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
+enum WriteFormat {
+    Flac,
+    Wav,
+    //Mp3
+}
+
+#[repr(C)]
+#[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
+enum SampleDepth {
+    Int16,
+    Float,
+}
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Input file or directory of files supported by libopenmpt
+    /// Input song or directory of files supported by libopenmpt
     #[clap(short, long)]
     input: String,
 
-    /// Output directory to place the generated wav files
+    /// Output directory to place the generated files
     #[clap(short, long)]
     output: String,
 
@@ -51,17 +72,21 @@ struct Args {
     #[clap(long, default_value = "false")]
     instruments: bool,
 
-    /// Write samples in the song to disk (best effort) 
-    #[clap(long, default_value = "false")]
-    samples: bool,
+    /// Write samples in the song to disk
+    #[clap(long)]
+    song_samples: Option<SampleOutputFormat>,
 
-    /// Sample depth for the rendering. Supported are "float" and "int16"
+    /// Write the individual instruments to disk using SDZ metadata and accompaning samples
+    //#[clap(long)]
+    //song_instruments: Option<SampleOutputFormat>,
+
+    /// Sample depth for the rendering.
     #[clap(short, long, default_value = "int16")]
-    format: String,
+    format: SampleDepth,
 
-    /// Write format for the rendering. Supported are "flac" and "wav" 
+    /// Write format for the rendering.
     #[clap(short, long, default_value = "flac")]
-    write: String,
+    write: WriteFormat,
 }
 
 #[repr(C)]
@@ -85,7 +110,7 @@ struct RenderParams {
 }
 
 extern "C" {
-    fn get_song_info_c(data: *const u8, len: u32, sample_output_path: *const u8) -> SongInfo;
+    fn get_song_info_c(data: *const u8, len: u32, sample_output_path: *const u8, sample_format: u32) -> SongInfo;
     fn song_render_c(
         output: *mut u8,
         output_len: u32,
@@ -95,13 +120,13 @@ extern "C" {
     ) -> u32;
 }
 
-fn get_song_info(file_data: &[u8], samples_output_path: Option<&Path>) -> SongInfo {
+fn get_song_info(file_data: &[u8], samples_output_path: Option<&Path>, sample_format: u32) -> SongInfo {
     if let Some(path) = samples_output_path {
         let os_path = path.to_string_lossy().into_owned();
         let c_filename = std::ffi::CString::new(os_path).unwrap();
-        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, c_filename.as_ptr() as *const _) }
+        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, c_filename.as_ptr() as *const _, sample_format ) }
     } else {
-        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, std::ptr::null()) }
+        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, std::ptr::null(), 0) }
     }
 }
 fn song_render(
@@ -172,34 +197,6 @@ fn write_flac_file(
         channel_count as _, 
         bytes_per_sample as _, 
         sample_rate as _);  
-
-    /*
-    let bits_per_sample = if bytes_per_sample == 4 { 24 } else { 16 };
-
-    let samples = if bytes_per_sample == 4 {
-        let data: &[f32] = bytemuck::cast_slice(&buffer);
-        data.iter().map(|x| (*x * (1 << (bits_per_sample - 1)) as f32) as i32).collect::<Vec<i32>>()
-    } else {
-        let data: &[i16] = bytemuck::cast_slice(&buffer);
-        data.iter().map(|x| (*x as i32)).collect::<Vec<i32>>()
-    };
-
-    let config = flacenc::config::Encoder::default();
-    let source = flacenc::source::MemSource::from_samples(
-        &samples, channel_count as _, bits_per_sample, sample_rate as _);
-
-    let flac_stream = flacenc::encode_with_fixed_block_size(
-        &config, source, config.block_sizes[0]
-    ).expect("Encode failed.");
-
-    // `Stream` imlpements `BitRepr` so you can obtain the encoded stream via
-    // `ByteSink` struct that implements `BitSink`.
-    let mut sink = flacenc::bitsink::ByteSink::new();
-    flac_stream.write(&mut sink).unwrap();
-
-    // Then, e.g. you can write it to a file.
-    std::fs::write(filename, sink.as_slice()).unwrap()
-    */
 }
 
 fn write_wav_file(
@@ -241,7 +238,7 @@ fn gen_song(
 
 ) {
     // Number of bytes needed given a sample depth
-    let bytes_per_sample = if args.format == "float" { 4 } else { 2 };
+    let bytes_per_sample = if args.format == SampleDepth::Float { 4 } else { 2 };
     // Number of bytes needed given a sample depth
     let mut channel_count = if args.stereo { 2 } else { 1 };
 
@@ -298,7 +295,7 @@ fn gen_song(
 
     // TODO: Optimize
     if output_buffer.iter().any(|x| *x != 0) {
-        if args.write == "flac" {
+        if args.write == WriteFormat::Flac {
             write_flac_file(
                 &filename,
                 output_buffer,
@@ -336,11 +333,11 @@ fn main() -> Result<()> {
 
         println!("Processing file {}", filename);
 
-        let song_info = if args.samples {
+        let song_info = if let Some(sample_format) = args.song_samples {
             let sample_path = Path::new(&args.output).join(format!("{}", stemname));
-            get_song_info(&song_buffer, Some(&sample_path))
+            get_song_info(&song_buffer, Some(&sample_path), sample_format as _)
         } else {
-            get_song_info(&song_buffer, None) 
+            get_song_info(&song_buffer, None, 0)
         };
 
         if song_info.channel_count == 0 || song_info.instrument_count == 0 {

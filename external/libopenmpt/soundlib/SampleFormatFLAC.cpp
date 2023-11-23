@@ -10,6 +10,7 @@
 
 #include "stdafx.h"
 #include "Sndfile.h"
+#include "../common/mptFileIO.h"
 #ifdef MODPLUG_TRACKER
 #include "../mptrack/TrackerSettings.h"
 #endif //MODPLUG_TRACKER
@@ -368,9 +369,11 @@ bool CSoundFile::ReadFLACSample(SAMPLEINDEX sample, FileReader &file)
 		uint8 oggPageVersion = file.ReadIntLE<uint8>();
 		uint8 oggPageHeaderType = file.ReadIntLE<uint8>();
 		uint64 oggPageGranulePosition = file.ReadIntLE<uint64>();
-		uint32 oggPageBitstreamSerialNumber = file.ReadIntLE<uint32>();
+		//uint32 oggPageBitstreamSerialNumber = file.ReadIntLE<uint32>();
+		file.ReadIntLE<uint32>();
 		uint32 oggPageSequenceNumber = file.ReadIntLE<uint32>();
-		uint32 oggPageChecksum = file.ReadIntLE<uint32>();
+		//uint32 oggPageChecksum = file.ReadIntLE<uint32>();
+		file.ReadIntLE<uint32>();
 		uint8 oggPageSegments = file.ReadIntLE<uint8>();
 		uint8 oggPageSegmentLength = file.ReadIntLE<uint8>();
 		if(oggPageVersion != 0)

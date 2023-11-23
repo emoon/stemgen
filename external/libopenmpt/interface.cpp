@@ -6,6 +6,10 @@
 #include <iostream>
 #include <fstream>
 
+enum SampleType {
+    SampleType_Wav,
+    SampleType_Flac,
+};
 
 struct SongInfo {
     int num_channels;
@@ -24,10 +28,15 @@ struct RenderParams {
     bool stereo_output;
 };
 
+enum SampleFormat {
+    SampleFormat_Flac,
+    SampleFormat_Wav,
+};
+
 extern "C"
 {
 
-SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len, const char* sample_output_path) {
+SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len, const char* output_with_stem, int sample_format) {
     SongInfo info = { 0, 0, 0.0f };
 
     try
@@ -48,19 +57,39 @@ SongInfo get_song_info_c(const uint8_t* buffer, uint32_t len, const char* sample
 
         info.length_seconds = (float)song.get_duration_seconds();
 
-        if (sample_output_path) {
-            OpenMPT::CSoundFile* sf = song.get_snd_file();
+        if (!output_with_stem) 
+            return info;
 
-            int num_samples = sf->GetNumSamples();
+        OpenMPT::CSoundFile* sf = song.get_snd_file();
 
-            for (int i = 1; i < num_samples + 1; ++i) {
-                char name[4096];
-                sprintf(name, "%s_sample_%04d.wav", sample_output_path, i);
-                std::ofstream f(name, std::ios::binary );
-                sf->SaveWAVSample(i, f);
+        int num_samples = sf->GetNumSamples();
+
+        for (int i = 1; i < num_samples + 1; ++i) {
+            char name[4096];
+            if (sample_format == SampleFormat_Flac) {
+                sprintf(name, "%s_sample_%04d.flac", output_with_stem, i);
+                std::ofstream f(name, std::ios::binary);
+                if (!sf->SaveFLACSample(i, f)) {
+                    printf("Failed to write sample: %s\n", name);
+                }
+            } else {
+                sprintf(name, "%s_sample_%04d.wav", output_with_stem, i);
+                std::ofstream f(name, std::ios::binary);
+                if (!sf->SaveWAVSample(i, f)) {
+                    printf("Failed to write sample: %s\n", name);
+                }
             }
         }
 
+        /*
+        for (int i = 1; i < info.num_instruments + 1; ++i) {
+            char name[4096];
+            sprintf(name, "%s_song_inst_%04d.sfz", output_with_stem, i);
+            std::ofstream f(name);
+            OpenMPT::mpt::PathString mpt_string = OpenMPT::mpt::PathString::FromUTF8(name); 
+            sf->SaveSFZInstrument(i, f, mpt_string, false);
+        }
+        */
     }
     catch (const std::exception&)
     {

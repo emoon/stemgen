@@ -26,9 +26,9 @@ sage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
 
 Options:
   -i, --input <INPUT>
-          Input file or directory of files supported by libopenmpt
+          Input song or directory of files supported by libopenmpt
   -o, --output <OUTPUT>
-          Output directory to place the generated wav files
+          Output directory to place the generated files
   -r, --recursive
           If input is a directory recursive can be used to get the all files within that directory
       --stereo-separation <STEREO_SEPARATION>
@@ -45,12 +45,12 @@ Options:
           Render each instrument for each channel (if false only a _all file will be generated)
       --instruments
           Render each instrument to a separate file
-      --samples
-          Write samples in the song to disk (best effort)
+      --song-samples <SONG_SAMPLES>
+          Write samples in the song to disk [possible values: flac, wav]
   -f, --format <FORMAT>
-          Sample depth for the rendering. Supported are "float" and "int16" [default: int16]
+          Write the individual instruments to disk using SDZ metadata and accompaning samples Sample depth for the rendering [default: int16] [possible values: int16, float]
   -w, --write <WRITE>
-          Write format for the rendering. Supported are "flac" and "wav" [default: flac]
+          Write format for the rendering [default: flac] [possible values: flac, wav]
   -h, --help
           Print help
   -V, --version

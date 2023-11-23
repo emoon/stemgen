@@ -47,6 +47,8 @@ fn main() {
     }
 
     build.define("LIBOPENMPT_BUILD", None);
+    build.define("MPT_WITH_FLAC", None);
+    build.define("MPT_ENABLE_FILEIO", None);
 
     add_files(&mut build, "external/libopenmpt/soundlib");
     add_files(&mut build, "external/libopenmpt/common");

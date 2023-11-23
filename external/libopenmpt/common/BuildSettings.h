@@ -134,9 +134,9 @@
 
 #if defined(LIBOPENMPT_BUILD)
 
-#ifdef MPT_WITH_FLAC
-#error "Building libopenmpt with FLAC is useless and not a supported configuration. Please fix your build system to not list libflac as a dependency for libopenmpt itself. It is only a dependency of openmpt123."
-#endif
+//#ifdef MPT_WITH_FLAC
+//#error "Building libopenmpt with FLAC is useless and not a supported configuration. Please fix your build system to not list libflac as a dependency for libopenmpt itself. It is only a dependency of openmpt123."
+//#endif
 
 #ifndef LIBOPENMPT_NO_DEPRECATE
 #define LIBOPENMPT_NO_DEPRECATE
