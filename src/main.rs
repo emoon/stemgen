@@ -3,8 +3,9 @@ use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
-use std::{fs::File, io::Read, path::Path, path::PathBuf};
+use std::{fs::File, io::{Read, Write}, path::Path, path::PathBuf};
 use vorbis_rs::{VorbisEncoderBuilder, VorbisBitrateManagementStrategy};
+use mp3lame_encoder::{InterleavedPcm, MonoPcm, Builder, FlushNoGap};
 use walkdir::WalkDir;
 use wav;
 
@@ -21,6 +22,7 @@ enum WriteFormat {
     Flac,
     Wav,
     Vorbis,
+    Mp3,
 }
 
 #[repr(C)]
@@ -270,8 +272,6 @@ fn write_ogg_vorbis(
         OggMode::QualityVbr => VorbisBitrateManagementStrategy::QualityVbr { target_quality },
     };
 
-    dbg!(bitrate_mode);
-
     let mut encoder = VorbisEncoderBuilder::new(
         core::num::NonZeroU32::new(args.sample_rate as _).unwrap(),
         core::num::NonZeroU8::new(channel_count as _).unwrap(),
@@ -342,6 +342,76 @@ fn write_ogg_vorbis(
         }
     }
 }
+
+fn write_mp3(
+    filename: &Path,
+    buffer: Vec<u8>,
+    args: &Args,
+    channel_count: usize,
+    bytes_per_sample: usize,
+) {
+    let filename = PathBuf::from(filename).with_extension("mp3"); 
+
+    let mut out_file = match File::create(&filename) {
+        Ok(f) => f,
+        Err(e) => {
+            log::error!("Unable to write to {:?} error: {:?}", filename, e);
+            return;
+        }
+    };
+
+    let mut mp3_encoder = Builder::new().expect("Create LAME builder");
+    mp3_encoder.set_num_channels(channel_count as _).expect("set channels");
+    mp3_encoder.set_sample_rate(args.sample_rate as _).expect("set sample rate");
+    mp3_encoder.set_brate(mp3lame_encoder::Bitrate::Kbps192).expect("set brate");
+    mp3_encoder.set_quality(mp3lame_encoder::Quality::Best).expect("set quality");
+    let mut mp3_encoder = mp3_encoder.build().expect("To initialize LAME encoder");
+
+    let mut mp3_out_buffer = Vec::new();
+    let encoded_size;
+
+    if channel_count == 2 {
+        if bytes_per_sample == 2 {
+            let data: &[i16] = bytemuck::cast_slice(&buffer);
+            let input = InterleavedPcm(data);
+
+            mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len() / 2));
+            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+        } else {
+            let data: &[f32] = bytemuck::cast_slice(&buffer);
+            let input = InterleavedPcm(data);
+
+            mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len() / 2));
+            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+        }
+    } else {
+        if bytes_per_sample == 2 {
+            let data: &[i16] = bytemuck::cast_slice(&buffer);
+            let input = MonoPcm(data);
+
+            mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len()));
+            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+        } else {
+            let data: &[f32] = bytemuck::cast_slice(&buffer);
+            let input = MonoPcm(data);
+
+            mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len()));
+            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+        }
+    }
+
+    unsafe {
+        mp3_out_buffer.set_len(mp3_out_buffer.len().wrapping_add(encoded_size));
+    }
+
+    let encoded_size = mp3_encoder.flush::<FlushNoGap>(mp3_out_buffer.spare_capacity_mut()).expect("to flush");
+    unsafe {
+        mp3_out_buffer.set_len(mp3_out_buffer.len().wrapping_add(encoded_size));
+    }
+
+    out_file.write_all(&mp3_out_buffer).unwrap();
+}
+
 
 fn gen_song(
     filestem: &str,
@@ -436,6 +506,15 @@ fn gen_song(
                     output_buffer,
                     &args,
                     channel_count,
+                );
+            }
+            WriteFormat::Mp3 => {
+                write_mp3(
+                    &filename,
+                    output_buffer,
+                    &args,
+                    channel_count,
+                    bytes_per_sample as _,
                 );
             }
         }

@@ -10,7 +10,6 @@ cc = { version = "1.0", features = ["parallel"] }
 [dependencies]
 anyhow = "1.0"
 libflac-sys = { path = "libflac-sys" }
-flacenc = { git = "https://github.com/yotarok/flacenc-rs", default-featuers = false }
 clap = { version = "4.4", features = ["derive"] }
 indicatif = "0.17.0-rc.8"
 bytemuck = "1.14.0"
@@ -20,3 +19,4 @@ simple_logger = "2.1.0"
 walkdir = "2"
 wav = "1.0"
 vorbis_rs = "0.5.0"
+mp3lame-encoder = "0.1.4"
