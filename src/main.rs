@@ -16,7 +16,6 @@ enum SampleOutputFormat {
     Wav,
 }
 
-#[repr(C)]
 #[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
 enum WriteFormat {
     Flac,
@@ -25,20 +24,56 @@ enum WriteFormat {
     Mp3,
 }
 
-#[repr(C)]
 #[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
 enum SampleDepth {
     Int16,
     Float,
 }
 
-#[repr(C)]
 #[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
 enum OggMode {
     Vbr,
     QualityVbr,
     Abr,
     ConstrainedAbr,
+}
+
+#[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
+pub enum Mp3VbrMode {
+    ///Off.
+    Off,
+    ///MT.
+    Mt,
+    ///RH.
+    Rh,
+    ///ABR.
+    Abr,
+    ///MTRH.
+    Mtrh,
+}
+
+#[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
+pub enum Mp3Quality {
+    ///Best possible quality
+    Best = 0,
+    ///Second best
+    SecondBest = 1,
+    ///Close to best
+    NearBest = 2,
+    ///Very nice
+    VeryNice = 3,
+    ///Nice
+    Nice = 4,
+    ///Good
+    Good = 5,
+    ///Decent
+    Decent = 6,
+    ///Okayish
+    Ok = 7,
+    ///Almost worst
+    SecondWorst = 8,
+    ///Worst
+    Worst = 9,
 }
 
 #[derive(Parser, Debug)]
@@ -107,6 +142,22 @@ struct Args {
     /// Quality option for quality-vbr range is [-0.2, 1]
     #[clap(long, default_value = "0.5")]
     vorbis_quality: f32,
+
+    /// Bitrate for mp3 encoding in kbps supported values: [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]
+    #[clap(long, default_value = "320")]
+    mp3_bitrate: u32,
+
+    /// Vbr mode for mp3 encoding 
+    #[clap(long, default_value = "abr")]
+    mp3_vbr: Mp3VbrMode,
+
+    /// Quality for VBR encoding 
+    #[clap(long, default_value = "good")]
+    mp3_vbr_quality: Mp3Quality,
+
+    /// Quality for regular encoding 
+    #[clap(long, default_value = "good")]
+    mp3_quality: Mp3Quality,
 }
 
 #[repr(C)]
@@ -331,6 +382,7 @@ fn write_ogg_vorbis(
             }
 
             offset += step_value;
+
         }
     }
 
@@ -360,11 +412,68 @@ fn write_mp3(
         }
     };
 
+    let bitrate = match args.mp3_bitrate {
+        8 => mp3lame_encoder::Bitrate::Kbps8,
+        16 => mp3lame_encoder::Bitrate::Kbps16,
+        24 => mp3lame_encoder::Bitrate::Kbps24,
+        32 => mp3lame_encoder::Bitrate::Kbps32,
+        40 => mp3lame_encoder::Bitrate::Kbps40,
+        48 => mp3lame_encoder::Bitrate::Kbps48,
+        64 => mp3lame_encoder::Bitrate::Kbps64,
+        80 => mp3lame_encoder::Bitrate::Kbps80,
+        96 => mp3lame_encoder::Bitrate::Kbps96,
+        112 => mp3lame_encoder::Bitrate::Kbps112,
+        128 => mp3lame_encoder::Bitrate::Kbps128,
+        160 => mp3lame_encoder::Bitrate::Kbps160,
+        192 => mp3lame_encoder::Bitrate::Kbps192,
+        224 => mp3lame_encoder::Bitrate::Kbps224,
+        256 => mp3lame_encoder::Bitrate::Kbps256,
+        320 => mp3lame_encoder::Bitrate::Kbps320,
+        _ => panic!("Invalid bitrate for mp3 {}", args.mp3_bitrate),
+    };
+
+    let quality = match args.mp3_quality {
+        Mp3Quality::Best => mp3lame_encoder::Quality::Best,
+        Mp3Quality::SecondBest => mp3lame_encoder::Quality::SecondBest,
+        Mp3Quality::NearBest => mp3lame_encoder::Quality::NearBest,
+        Mp3Quality::VeryNice => mp3lame_encoder::Quality::VeryNice,
+        Mp3Quality::Nice => mp3lame_encoder::Quality::Nice,
+        Mp3Quality::Good => mp3lame_encoder::Quality::Good,
+        Mp3Quality::Decent => mp3lame_encoder::Quality::Decent,
+        Mp3Quality::Ok => mp3lame_encoder::Quality::Ok,
+        Mp3Quality::SecondWorst => mp3lame_encoder::Quality::SecondWorst,
+        Mp3Quality::Worst => mp3lame_encoder::Quality::Worst,
+    };
+
+    let vbr_quality = match args.mp3_vbr_quality {
+        Mp3Quality::Best => mp3lame_encoder::Quality::Best,
+        Mp3Quality::SecondBest => mp3lame_encoder::Quality::SecondBest,
+        Mp3Quality::NearBest => mp3lame_encoder::Quality::NearBest,
+        Mp3Quality::VeryNice => mp3lame_encoder::Quality::VeryNice,
+        Mp3Quality::Nice => mp3lame_encoder::Quality::Nice,
+        Mp3Quality::Good => mp3lame_encoder::Quality::Good,
+        Mp3Quality::Decent => mp3lame_encoder::Quality::Decent,
+        Mp3Quality::Ok => mp3lame_encoder::Quality::Ok,
+        Mp3Quality::SecondWorst => mp3lame_encoder::Quality::SecondWorst,
+        Mp3Quality::Worst => mp3lame_encoder::Quality::Worst,
+    };
+
+    let vbr_mode = match args.mp3_vbr {
+        Mp3VbrMode::Off => mp3lame_encoder::VbrMode::Off,
+        Mp3VbrMode::Mt => mp3lame_encoder::VbrMode::Mt,
+        Mp3VbrMode::Rh => mp3lame_encoder::VbrMode::Rh,
+        Mp3VbrMode::Abr => mp3lame_encoder::VbrMode::Abr,
+        Mp3VbrMode::Mtrh => mp3lame_encoder::VbrMode::Mtrh,
+    };
+
     let mut mp3_encoder = Builder::new().expect("Create LAME builder");
     mp3_encoder.set_num_channels(channel_count as _).expect("set channels");
     mp3_encoder.set_sample_rate(args.sample_rate as _).expect("set sample rate");
-    mp3_encoder.set_brate(mp3lame_encoder::Bitrate::Kbps192).expect("set brate");
-    mp3_encoder.set_quality(mp3lame_encoder::Quality::Best).expect("set quality");
+    mp3_encoder.set_brate(bitrate).expect("set brate");
+    mp3_encoder.set_quality(quality).expect("set quality");
+    mp3_encoder.set_to_write_vbr_tag(true).expect("set quality");
+    mp3_encoder.set_vbr_mode(vbr_mode).expect("set vbr mode");
+    mp3_encoder.set_vbr_quality(vbr_quality).expect("set vbr quality");
     let mut mp3_encoder = mp3_encoder.build().expect("To initialize LAME encoder");
 
     let mut mp3_out_buffer = Vec::new();
