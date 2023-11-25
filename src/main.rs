@@ -140,7 +140,7 @@ struct Args {
     vorbis_bitrate: u32,
 
     /// Quality option for quality-vbr range is [-0.2, 1]
-    #[clap(long, default_value = "0.5")]
+    #[clap(long, allow_hyphen_values(true), default_value = "0.5")]
     vorbis_quality: f32,
 
     /// Bitrate for mp3 encoding in kbps supported values: [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]
