@@ -1,11 +1,16 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
+use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm, MonoPcm};
 use rayon::prelude::*;
 use simple_logger::SimpleLogger;
-use std::{fs::File, io::{Read, Write}, path::Path, path::PathBuf};
-use vorbis_rs::{VorbisEncoderBuilder, VorbisBitrateManagementStrategy};
-use mp3lame_encoder::{InterleavedPcm, MonoPcm, Builder, FlushNoGap};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+    path::PathBuf,
+};
+use vorbis_rs::{VorbisBitrateManagementStrategy, VorbisEncoderBuilder};
 use walkdir::WalkDir;
 use wav;
 
@@ -95,7 +100,7 @@ struct Args {
     #[clap(long, default_value = None)]
     stereo_separation: Option<u32>,
 
-    /// Render the whole song as is 
+    /// Render the whole song as is
     #[clap(long, default_value = "false")]
     full: bool,
 
@@ -131,11 +136,11 @@ struct Args {
     #[clap(short, long, default_value = "flac")]
     write: WriteFormat,
 
-    /// Mode for the ogg vorbis encoding. 
+    /// Mode for the ogg vorbis encoding.
     #[clap(long, default_value = "vbr")]
     vorbis_mode: OggMode,
 
-    /// Bitrate option for vbr, abr, quality-vbr and constrained-abr 
+    /// Bitrate option for vbr, abr, quality-vbr and constrained-abr
     #[clap(long, default_value = "160")]
     vorbis_bitrate: u32,
 
@@ -147,15 +152,15 @@ struct Args {
     #[clap(long, default_value = "320")]
     mp3_bitrate: u32,
 
-    /// Vbr mode for mp3 encoding 
+    /// Vbr mode for mp3 encoding
     #[clap(long, default_value = "abr")]
     mp3_vbr: Mp3VbrMode,
 
-    /// Quality for VBR encoding 
+    /// Quality for VBR encoding
     #[clap(long, default_value = "good")]
     mp3_vbr_quality: Mp3Quality,
 
-    /// Quality for regular encoding 
+    /// Quality for regular encoding
     #[clap(long, default_value = "good")]
     mp3_quality: Mp3Quality,
 }
@@ -181,7 +186,12 @@ struct RenderParams {
 }
 
 extern "C" {
-    fn get_song_info_c(data: *const u8, len: u32, sample_output_path: *const u8, sample_format: u32) -> SongInfo;
+    fn get_song_info_c(
+        data: *const u8,
+        len: u32,
+        sample_output_path: *const u8,
+        sample_format: u32,
+    ) -> SongInfo;
     fn song_render_c(
         output: *mut u8,
         output_len: u32,
@@ -191,20 +201,34 @@ extern "C" {
     ) -> u32;
 }
 
-fn get_song_info(file_data: &[u8], samples_output_path: Option<&Path>, sample_format: u32) -> SongInfo {
+fn get_song_info(
+    file_data: &[u8],
+    samples_output_path: Option<&Path>,
+    sample_format: u32,
+) -> SongInfo {
     if let Some(path) = samples_output_path {
         let os_path = path.to_string_lossy().into_owned();
         let c_filename = std::ffi::CString::new(os_path).unwrap();
-        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, c_filename.as_ptr() as *const _, sample_format ) }
+        unsafe {
+            get_song_info_c(
+                file_data.as_ptr(),
+                file_data.len() as u32,
+                c_filename.as_ptr() as *const _,
+                sample_format,
+            )
+        }
     } else {
-        unsafe { get_song_info_c(file_data.as_ptr(), file_data.len() as u32, std::ptr::null(), 0) }
+        unsafe {
+            get_song_info_c(
+                file_data.as_ptr(),
+                file_data.len() as u32,
+                std::ptr::null(),
+                0,
+            )
+        }
     }
 }
-fn song_render(
-    output: &mut [u8],
-    input: &[u8],
-    render_params: &RenderParams,
-) -> u32 {
+fn song_render(output: &mut [u8], input: &[u8], render_params: &RenderParams) -> u32 {
     unsafe {
         song_render_c(
             output.as_mut_ptr(),
@@ -260,14 +284,15 @@ fn write_flac_file(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("flac"); 
+    let filename = PathBuf::from(filename).with_extension("flac");
 
     libflac_sys::encode_flac(
-        &filename, 
-        &buffer, 
-        channel_count as _, 
-        bytes_per_sample as _, 
-        sample_rate as _);  
+        &filename,
+        &buffer,
+        channel_count as _,
+        bytes_per_sample as _,
+        sample_rate as _,
+    );
 }
 
 fn write_wav_file(
@@ -277,7 +302,7 @@ fn write_wav_file(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("wav"); 
+    let filename = PathBuf::from(filename).with_extension("wav");
 
     let (format, bits) = if bytes_per_sample == 4 {
         (wav::header::WAV_FORMAT_IEEE_FLOAT, 32)
@@ -298,13 +323,8 @@ fn write_wav_file(
     wav::write(wav_header, &buffer.into(), &mut out_file).unwrap();
 }
 
-fn write_ogg_vorbis(
-    filename: &Path,
-    buffer: Vec<u8>,
-    args: &Args,
-    channel_count: usize,
-) {
-    let filename = PathBuf::from(filename).with_extension("ogg"); 
+fn write_ogg_vorbis(filename: &Path, buffer: Vec<u8>, args: &Args, channel_count: usize) {
+    let filename = PathBuf::from(filename).with_extension("ogg");
     let mut out_file = match File::create(&filename) {
         Ok(f) => f,
         Err(e) => {
@@ -318,8 +338,12 @@ fn write_ogg_vorbis(
 
     let bitrate_mode = match args.vorbis_mode {
         OggMode::Vbr => VorbisBitrateManagementStrategy::Vbr { target_bitrate: br },
-        OggMode::Abr => VorbisBitrateManagementStrategy::Abr { average_bitrate: br },
-        OggMode::ConstrainedAbr => VorbisBitrateManagementStrategy::ConstrainedAbr { maximum_bitrate: br },
+        OggMode::Abr => VorbisBitrateManagementStrategy::Abr {
+            average_bitrate: br,
+        },
+        OggMode::ConstrainedAbr => VorbisBitrateManagementStrategy::ConstrainedAbr {
+            maximum_bitrate: br,
+        },
         OggMode::QualityVbr => VorbisBitrateManagementStrategy::QualityVbr { target_quality },
     };
 
@@ -327,7 +351,11 @@ fn write_ogg_vorbis(
         core::num::NonZeroU32::new(args.sample_rate as _).unwrap(),
         core::num::NonZeroU8::new(channel_count as _).unwrap(),
         &mut out_file,
-    ).unwrap().bitrate_management_strategy(bitrate_mode).build().unwrap();
+    )
+    .unwrap()
+    .bitrate_management_strategy(bitrate_mode)
+    .build()
+    .unwrap();
 
     if channel_count == 1 {
         let data: &[f32] = bytemuck::cast_slice(&buffer);
@@ -367,7 +395,10 @@ fn write_ogg_vorbis(
         loop {
             let step_value = std::cmp::min(sample_step, len - offset);
 
-            let t = [&channel0[offset..offset + step_value], &channel1[offset.. offset + step_value]];
+            let t = [
+                &channel0[offset..offset + step_value],
+                &channel1[offset..offset + step_value],
+            ];
 
             match encoder.encode_audio_block(&t) {
                 Ok(_) => (),
@@ -382,7 +413,6 @@ fn write_ogg_vorbis(
             }
 
             offset += step_value;
-
         }
     }
 
@@ -402,7 +432,7 @@ fn write_mp3(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("mp3"); 
+    let filename = PathBuf::from(filename).with_extension("mp3");
 
     let mut out_file = match File::create(&filename) {
         Ok(f) => f,
@@ -467,13 +497,19 @@ fn write_mp3(
     };
 
     let mut mp3_encoder = Builder::new().expect("Create LAME builder");
-    mp3_encoder.set_num_channels(channel_count as _).expect("set channels");
-    mp3_encoder.set_sample_rate(args.sample_rate as _).expect("set sample rate");
+    mp3_encoder
+        .set_num_channels(channel_count as _)
+        .expect("set channels");
+    mp3_encoder
+        .set_sample_rate(args.sample_rate as _)
+        .expect("set sample rate");
     mp3_encoder.set_brate(bitrate).expect("set brate");
     mp3_encoder.set_quality(quality).expect("set quality");
     mp3_encoder.set_to_write_vbr_tag(true).expect("set quality");
     mp3_encoder.set_vbr_mode(vbr_mode).expect("set vbr mode");
-    mp3_encoder.set_vbr_quality(vbr_quality).expect("set vbr quality");
+    mp3_encoder
+        .set_vbr_quality(vbr_quality)
+        .expect("set vbr quality");
     let mut mp3_encoder = mp3_encoder.build().expect("To initialize LAME encoder");
 
     let mut mp3_out_buffer = Vec::new();
@@ -485,13 +521,17 @@ fn write_mp3(
             let input = InterleavedPcm(data);
 
             mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len() / 2));
-            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+            encoded_size = mp3_encoder
+                .encode(input, mp3_out_buffer.spare_capacity_mut())
+                .expect("To encode");
         } else {
             let data: &[f32] = bytemuck::cast_slice(&buffer);
             let input = InterleavedPcm(data);
 
             mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len() / 2));
-            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+            encoded_size = mp3_encoder
+                .encode(input, mp3_out_buffer.spare_capacity_mut())
+                .expect("To encode");
         }
     } else {
         if bytes_per_sample == 2 {
@@ -499,13 +539,17 @@ fn write_mp3(
             let input = MonoPcm(data);
 
             mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len()));
-            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+            encoded_size = mp3_encoder
+                .encode(input, mp3_out_buffer.spare_capacity_mut())
+                .expect("To encode");
         } else {
             let data: &[f32] = bytemuck::cast_slice(&buffer);
             let input = MonoPcm(data);
 
             mp3_out_buffer.reserve(mp3lame_encoder::max_required_buffer_size(data.len()));
-            encoded_size = mp3_encoder.encode(input, mp3_out_buffer.spare_capacity_mut()).expect("To encode");
+            encoded_size = mp3_encoder
+                .encode(input, mp3_out_buffer.spare_capacity_mut())
+                .expect("To encode");
         }
     }
 
@@ -513,14 +557,15 @@ fn write_mp3(
         mp3_out_buffer.set_len(mp3_out_buffer.len().wrapping_add(encoded_size));
     }
 
-    let encoded_size = mp3_encoder.flush::<FlushNoGap>(mp3_out_buffer.spare_capacity_mut()).expect("to flush");
+    let encoded_size = mp3_encoder
+        .flush::<FlushNoGap>(mp3_out_buffer.spare_capacity_mut())
+        .expect("to flush");
     unsafe {
         mp3_out_buffer.set_len(mp3_out_buffer.len().wrapping_add(encoded_size));
     }
 
     out_file.write_all(&mp3_out_buffer).unwrap();
 }
-
 
 fn gen_song(
     filestem: &str,
@@ -530,24 +575,28 @@ fn gen_song(
     channel: i32,
     instrument: i32,
     stereo: bool,
-
 ) {
     // Number of bytes needed given a sample depth
-    let bytes_per_sample = if args.format == SampleDepth::Float { 4 } else { 2 };
+    let bytes_per_sample = if args.format == SampleDepth::Float {
+        4
+    } else {
+        2
+    };
     // Number of bytes needed given a sample depth
     let mut channel_count = if args.stereo { 2 } else { 1 };
 
-    let (stereo_separation, stereo_separation_enabled) = if let Some(stereo_sep) = args.stereo_separation {
-        (stereo_sep, true)
-    } else {
-        (100, false)
-    };
+    let (stereo_separation, stereo_separation_enabled) =
+        if let Some(stereo_sep) = args.stereo_separation {
+            (stereo_sep, true)
+        } else {
+            (100, false)
+        };
 
-    let mut stereo = stereo;    
+    let mut stereo = stereo;
 
     // two channels for full track
     if channel == -1 && instrument == -1 {
-        channel_count = 2; 
+        channel_count = 2;
         stereo = true;
     }
 
@@ -572,13 +621,15 @@ fn gen_song(
     } else {
         Path::new(&args.output).join(format!(
             "{}_{:04}_chan_{:04}",
-            filestem, instrument + 1, channel
+            filestem,
+            instrument + 1,
+            channel
         ))
     };
 
     // two channels for full track
     if channel == -1 && instrument == -1 {
-        channel_count = 2; 
+        channel_count = 2;
     }
 
     let output_size_bytes = song_len * sample_rate * bytes_per_sample as usize * channel_count * 2;
@@ -610,12 +661,7 @@ fn gen_song(
                 );
             }
             WriteFormat::Vorbis => {
-                write_ogg_vorbis(
-                    &filename,
-                    output_buffer,
-                    &args,
-                    channel_count,
-                );
+                write_ogg_vorbis(&filename, output_buffer, &args, channel_count);
             }
             WriteFormat::Mp3 => {
                 write_mp3(
@@ -648,7 +694,7 @@ fn main() -> Result<()> {
         let mut file = File::open(&filename)?;
         let mut song_buffer = Vec::new();
         file.read_to_end(&mut song_buffer)?;
-        
+
         let stemname = file_path.file_stem().unwrap().to_str().unwrap();
 
         println!("Processing file {}", filename);
@@ -674,15 +720,7 @@ fn main() -> Result<()> {
         }
 
         if args.full {
-            gen_song(
-                &stemname,
-                &song_info,
-                &song_buffer,
-                &args,
-                -1,
-                -1,
-                true,
-            );
+            gen_song(&stemname, &song_info, &song_buffer, &args, -1, -1, true);
         }
 
         let mut pb = None;
@@ -693,7 +731,7 @@ fn main() -> Result<()> {
         if args.channels {
             let channel_count = song_info.channel_count;
             let instrument_count = song_info.instrument_count;
-            let total_count = channel_count * instrument_count; 
+            let total_count = channel_count * instrument_count;
 
             if args.progress {
                 let p = ProgressBar::new(total_count as u64);
@@ -701,25 +739,23 @@ fn main() -> Result<()> {
                 pb = Some(p);
             }
 
-            (0..total_count)
-                .into_par_iter()
-                .for_each(|index| {
-                    let instrument = index / channel_count;
-                    let channel = index % channel_count;
-                    gen_song(
-                        &stemname,
-                        &song_info,
-                        &song_buffer,
-                        &args,
-                        channel as _,
-                        instrument as _,
-                        args.stereo
-                    );
+            (0..total_count).into_par_iter().for_each(|index| {
+                let instrument = index / channel_count;
+                let channel = index % channel_count;
+                gen_song(
+                    &stemname,
+                    &song_info,
+                    &song_buffer,
+                    &args,
+                    channel as _,
+                    instrument as _,
+                    args.stereo,
+                );
 
-                    if let Some(p) = &pb {
-                        p.inc(1);
-                    }
-                });
+                if let Some(p) = &pb {
+                    p.inc(1);
+                }
+            });
         } else if args.instruments {
             if args.progress {
                 let p = ProgressBar::new(song_info.instrument_count as u64);
@@ -736,7 +772,7 @@ fn main() -> Result<()> {
                         &args,
                         -1,
                         instrument as _,
-                        args.stereo
+                        args.stereo,
                     );
 
                     if let Some(p) = &pb {
