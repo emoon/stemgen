@@ -50,13 +50,13 @@ private:
 	};
 
 	void EnsureCacheBuffer(std::size_t requiredbuffersize) const {
-		if (cache.size() >= cachesize + requiredbuffersize) {
+		if (cache.size() - cachesize >= requiredbuffersize) {
 			return;
 		}
 		if (cache.size() == 0) {
-			cache.resize(mpt::align_up<std::size_t>(cachesize + requiredbuffersize, BUFFER_SIZE));
+			cache.resize(mpt::saturate_align_up<std::size_t>(cachesize + requiredbuffersize, BUFFER_SIZE));
 		} else if (mpt::exponential_grow(cache.size()) < cachesize + requiredbuffersize) {
-			cache.resize(mpt::align_up<std::size_t>(cachesize + requiredbuffersize, BUFFER_SIZE));
+			cache.resize(mpt::saturate_align_up<std::size_t>(cachesize + requiredbuffersize, BUFFER_SIZE));
 		} else {
 			cache.resize(mpt::exponential_grow(cache.size()));
 		}
@@ -74,7 +74,6 @@ private:
 		streamFullyCached = true;
 	}
 
-
 	void CacheStreamUpTo(pos_type pos, pos_type length) const {
 		if (streamFullyCached) {
 			return;
@@ -86,21 +85,20 @@ private:
 		if (target <= cachesize) {
 			return;
 		}
-		std::size_t alignedpos = mpt::align_up<std::size_t>(target, QUANTUM_SIZE);
-		std::size_t needcount = alignedpos - cachesize;
-		EnsureCacheBuffer(needcount);
-		std::size_t readcount = InternalReadUnseekable(mpt::span(&cache[cachesize], alignedpos - cachesize)).size();
-		cachesize += readcount;
-		if (!InternalEof()) {
-			// can read further
-			return;
+		std::size_t alignedpos = mpt::saturate_align_up<std::size_t>(target, QUANTUM_SIZE);
+		while (!InternalEof() && (cachesize < alignedpos)) {
+			EnsureCacheBuffer(BUFFER_SIZE);
+			std::size_t readcount = InternalReadUnseekable(mpt::span(&cache[cachesize], BUFFER_SIZE)).size();
+			cachesize += readcount;
 		}
-		streamFullyCached = true;
+		if (InternalEof()) {
+			streamFullyCached = true;
+		}
 	}
 
 private:
 	void ReadCached(pos_type pos, mpt::byte_span dst) const {
-		std::copy(cache.begin() + pos, cache.begin() + pos + dst.size(), dst.data());
+		std::copy(cache.begin() + static_cast<std::size_t>(pos), cache.begin() + static_cast<std::size_t>(pos + dst.size()), dst.data());
 	}
 
 public:
@@ -128,23 +126,23 @@ public:
 
 	mpt::byte_span Read(pos_type pos, mpt::byte_span dst) const override {
 		CacheStreamUpTo(pos, dst.size());
-		if (pos >= IFileData::pos_type(cachesize)) {
+		if (pos >= static_cast<pos_type>(cachesize)) {
 			return dst.first(0);
 		}
-		IFileData::pos_type cache_avail = std::min(IFileData::pos_type(cachesize) - pos, dst.size());
-		ReadCached(pos, dst.subspan(0, cache_avail));
-		return dst.subspan(0, cache_avail);
+		pos_type cache_avail = std::min(static_cast<pos_type>(cachesize) - pos, static_cast<pos_type>(dst.size()));
+		ReadCached(pos, dst.subspan(0, static_cast<std::size_t>(cache_avail)));
+		return dst.subspan(0, static_cast<std::size_t>(cache_avail));
 	}
 
 	bool CanRead(pos_type pos, pos_type length) const override {
 		CacheStreamUpTo(pos, length);
-		if ((pos == IFileData::pos_type(cachesize)) && (length == 0)) {
+		if ((pos == static_cast<pos_type>(cachesize)) && (length == 0)) {
 			return true;
 		}
-		if (pos >= IFileData::pos_type(cachesize)) {
+		if (pos >= static_cast<pos_type>(cachesize)) {
 			return false;
 		}
-		return length <= IFileData::pos_type(cachesize) - pos;
+		return length <= static_cast<pos_type>(cachesize) - pos;
 	}
 
 	pos_type GetReadableLength(pos_type pos, pos_type length) const override {
@@ -152,7 +150,7 @@ public:
 		if (pos >= cachesize) {
 			return 0;
 		}
-		return std::min(static_cast<IFileData::pos_type>(cachesize) - pos, length);
+		return std::min(static_cast<pos_type>(cachesize) - pos, length);
 	}
 
 private:

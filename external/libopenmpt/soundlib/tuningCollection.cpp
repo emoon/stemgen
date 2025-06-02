@@ -14,9 +14,9 @@
 #include "mpt/io/io_stdstream.hpp"
 #include "../common/serialization_utils.h"
 #include <algorithm>
-#include "../common/mptFileIO.h"
 #include "Loaders.h"
 #ifdef MODPLUG_TRACKER
+#include "../common/mptFileIO.h"
 #include "mpt/fs/fs.hpp"
 #include "mpt/io_file/outputfile.hpp"
 #include "../mptrack/TrackerSettings.h"
@@ -80,6 +80,26 @@ const CTuning* CTuningCollection::GetTuning(const mpt::ustring &name) const
 		}
 	}
 	return nullptr;
+}
+
+
+const CTuning* CTuningCollection::FindIdenticalTuning(const CTuning &tuning) const
+{
+	auto result = std::find_if(m_Tunings.begin(), m_Tunings.end(), [&tuning](const std::unique_ptr<CTuning> &other)
+	{
+		return other && tuning == *other;
+	});
+	return (result != m_Tunings.end()) ? result->get() : nullptr;
+}
+
+
+CTuning* CTuningCollection::FindIdenticalTuning(const CTuning &tuning)
+{
+	auto result = std::find_if(m_Tunings.begin(), m_Tunings.end(), [&tuning](const std::unique_ptr<CTuning> &other)
+	{
+		return other && tuning == *other;
+	});
+	return (result != m_Tunings.end()) ? result->get() : nullptr;
 }
 
 

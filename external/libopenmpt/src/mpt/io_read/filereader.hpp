@@ -10,6 +10,7 @@
 #include "mpt/base/integer.hpp"
 #include "mpt/base/memory.hpp"
 #include "mpt/base/namespace.hpp"
+#include "mpt/base/saturate_cast.hpp"
 #include "mpt/base/span.hpp"
 #include "mpt/base/utility.hpp"
 #include "mpt/io/base.hpp"
@@ -41,6 +42,12 @@ namespace IO {
 
 
 namespace FileReader {
+
+
+
+// change to show warnings for functions which trigger pre-caching the whole file for unseekable streams
+//#define MPT_FILEREADER_DEPRECATED [[deprecated]]
+#define MPT_FILEREADER_DEPRECATED
 
 
 
@@ -98,21 +105,17 @@ bool HasFastGetLength(const TFileCursor & f) {
 	return f.HasFastGetLength();
 }
 
-#if 0
 // Returns size of the mapped file in bytes.
 template <typename TFileCursor>
-MPT_FILECURSOR_DEPRECATED typename TFileCursor::pos_type GetLength(const TFileCursor & f) {
+MPT_FILEREADER_DEPRECATED typename TFileCursor::pos_type GetLength(const TFileCursor & f) {
 	return f.GetLength();
 }
-#endif
 
-#if 0
 // Return byte count between cursor position and end of file, i.e. how many bytes can still be read.
 template <typename TFileCursor>
-MPT_FILECURSOR_DEPRECATED typename TFileCursor::pos_type BytesLeft(const TFileCursor & f) {
+MPT_FILEREADER_DEPRECATED typename TFileCursor::pos_type BytesLeft(const TFileCursor & f) {
 	return f.BytesLeft();
 }
-#endif
 
 template <typename TFileCursor>
 bool EndOfFile(const TFileCursor & f) {
@@ -264,7 +267,7 @@ template <typename T, std::size_t destSize, typename TFileCursor>
 bool ReadArray(TFileCursor & f, std::array<T, destSize> & destArray) {
 	static_assert(mpt::is_binary_safe<T>::value);
 	if (!f.CanRead(sizeof(destArray))) {
-		destArray.fill(T{});
+		mpt::reset(destArray);
 		return false;
 	}
 	f.ReadRaw(mpt::as_raw_memory(destArray));
@@ -319,7 +322,7 @@ T ReadIntBE(TFileCursor & f) {
 // Read a integer in little-endian format which has some of its higher bytes not stored in file.
 // If successful, the file cursor is advanced by the given size.
 template <typename T, typename TFileCursor>
-T ReadTruncatedIntLE(TFileCursor & f, typename TFileCursor::pos_type size) {
+T ReadTruncatedIntLE(TFileCursor & f, std::size_t size) {
 	static_assert(std::numeric_limits<T>::is_integer == true, "Target type is a not an integer");
 	assert(sizeof(T) >= size);
 	if (size == 0) {
@@ -349,7 +352,7 @@ T ReadTruncatedIntLE(TFileCursor & f, typename TFileCursor::pos_type size) {
 // If more bytes are stored, higher order bytes are silently ignored.
 // If successful, the file cursor is advanced by the given size.
 template <typename T, typename TFileCursor>
-T ReadSizedIntLE(TFileCursor & f, typename TFileCursor::pos_type size) {
+T ReadSizedIntLE(TFileCursor & f, std::size_t size) {
 	static_assert(std::numeric_limits<T>::is_integer == true, "Target type is a not an integer");
 	if (size == 0) {
 		return 0;
@@ -528,11 +531,11 @@ bool ReadStruct(TFileCursor & f, T & target) {
 // Allow to read a struct partially (if there's less memory available than the struct's size, fill it up with zeros).
 // The file cursor is advanced by "partialSize" bytes.
 template <typename T, typename TFileCursor>
-typename TFileCursor::pos_type ReadStructPartial(TFileCursor & f, T & target, typename TFileCursor::pos_type partialSize = sizeof(T)) {
+std::size_t ReadStructPartial(TFileCursor & f, T & target, std::size_t partialSize = sizeof(T)) {
 	static_assert(mpt::is_binary_safe<T>::value);
-	typename TFileCursor::pos_type copyBytes = std::min(partialSize, sizeof(T));
+	std::size_t copyBytes = std::min(partialSize, sizeof(T));
 	if (!f.CanRead(copyBytes)) {
-		copyBytes = f.BytesLeft();
+		copyBytes = mpt::saturate_cast<std::size_t>(f.BytesLeft());
 	}
 	f.GetRaw(mpt::span(mpt::as_raw_memory(target).data(), copyBytes));
 	std::memset(mpt::as_raw_memory(target).data() + copyBytes, 0, sizeof(target) - copyBytes);
@@ -542,13 +545,13 @@ typename TFileCursor::pos_type ReadStructPartial(TFileCursor & f, T & target, ty
 
 // Read a null-terminated string into a std::string
 template <typename TFileCursor>
-bool ReadNullString(TFileCursor & f, std::string & dest, const typename TFileCursor::pos_type maxLength = std::numeric_limits<typename TFileCursor::pos_type>::max()) {
+bool ReadNullString(TFileCursor & f, std::string & dest, const std::size_t maxLength = std::numeric_limits<std::size_t>::max()) {
 	dest.clear();
 	if (!f.CanRead(1)) {
 		return false;
 	}
 	char buffer[mpt::IO::BUFFERSIZE_MINUSCULE];
-	typename TFileCursor::pos_type avail = 0;
+	std::size_t avail = 0;
 	while ((avail = std::min(f.GetRaw(mpt::as_span(buffer)).size(), maxLength - dest.length())) != 0) {
 		auto end = std::find(buffer, buffer + avail, '\0');
 		dest.insert(dest.end(), buffer, end);
@@ -564,14 +567,14 @@ bool ReadNullString(TFileCursor & f, std::string & dest, const typename TFileCur
 
 // Read a string up to the next line terminator into a std::string
 template <typename TFileCursor>
-bool ReadLine(TFileCursor & f, std::string & dest, const typename TFileCursor::pos_type maxLength = std::numeric_limits<typename TFileCursor::pos_type>::max()) {
+bool ReadLine(TFileCursor & f, std::string & dest, const std::size_t maxLength = std::numeric_limits<std::size_t>::max()) {
 	dest.clear();
 	if (!f.CanRead(1)) {
 		return false;
 	}
 	char buffer[mpt::IO::BUFFERSIZE_MINUSCULE];
 	char c = '\0';
-	typename TFileCursor::pos_type avail = 0;
+	std::size_t avail = 0;
 	while ((avail = std::min(f.GetRaw(mpt::as_span(buffer)).size(), maxLength - dest.length())) != 0) {
 		auto end = std::find_if(buffer, buffer + avail, mpt::is_any_line_ending<char>);
 		dest.insert(dest.end(), buffer, end);
@@ -600,7 +603,7 @@ bool ReadMagic(TFileCursor & f, const char (&magic)[N]) {
 	for (std::size_t i = 0; i < N - 1; ++i) {
 		assert(magic[i] != '\0');
 	}
-	constexpr typename TFileCursor::pos_type magicLength = N - 1;
+	constexpr std::size_t magicLength = N - 1;
 	std::byte buffer[magicLength] = {};
 	if (f.GetRaw(mpt::span(buffer, magicLength)).size() != magicLength) {
 		return false;
@@ -626,8 +629,8 @@ bool ReadVarInt(TFileCursor & f, T & target) {
 	}
 
 	std::byte bytes[16]; // More than enough for any valid VarInt
-	typename TFileCursor::pos_type avail = f.GetRaw(mpt::as_span(bytes)).size();
-	typename TFileCursor::pos_type readPos = 1;
+	std::size_t avail = f.GetRaw(mpt::as_span(bytes)).size();
+	std::size_t readPos = 1;
 
 	uint8 b = mpt::byte_cast<uint8>(bytes[0]);
 	target = (b & 0x7F);

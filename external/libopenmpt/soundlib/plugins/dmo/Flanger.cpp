@@ -11,9 +11,9 @@
 #include "stdafx.h"
 
 #ifndef NO_PLUGINS
-#include "../../Sndfile.h"
 #include "Flanger.h"
-#endif // !NO_PLUGINS
+#include "../../Sndfile.h"
+#endif  // !NO_PLUGINS
 
 OPENMPT_NAMESPACE_BEGIN
 
@@ -22,6 +22,7 @@ OPENMPT_NAMESPACE_BEGIN
 namespace DMO
 {
 
+// cppcheck-suppress duplInheritedMember
 IMixPlugin* Flanger::Create(VSTPluginLib &factory, CSoundFile &sndFile, SNDMIXPLUGIN &mixStruct)
 {
 	return new (std::nothrow) Flanger(factory, sndFile, mixStruct, false);
@@ -49,7 +50,7 @@ Flanger::Flanger(VSTPluginLib &factory, CSoundFile &sndFile, SNDMIXPLUGIN &mixSt
 }
 
 
-void Flanger::SetParameter(PlugParamIndex index, PlugParamValue value)
+void Flanger::SetParameter(PlugParamIndex index, PlugParamValue value, PlayState *, CHANNELINDEX)
 {
 	if(index < kFlangerNumParameters)
 	{
@@ -123,7 +124,7 @@ CString Flanger::GetParamDisplay(PlugParamIndex param)
 		value = FrequencyInHertz();
 		break;
 	case kFlangerWaveShape:
-		return (value < 1) ? _T("Triangle") : _T("Sine");
+		return (value < 1) ? _T("Square") : _T("Sine");
 		break;
 	case kFlangerPhase:
 		switch(Phase())

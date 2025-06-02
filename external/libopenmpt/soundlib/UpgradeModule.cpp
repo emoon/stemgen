@@ -352,8 +352,21 @@ void CSoundFile::UpgradeModule()
 		}
 	}
 
+	bool hasAnyPlugins = false;
+	if(GetType() & (MOD_TYPE_IT | MOD_TYPE_MPT | MOD_TYPE_XM))
+	{
+		for(auto &plugin : m_MixPlugins)
+		{
+			if(plugin.IsValidPlugin())
+			{
+				hasAnyPlugins = true;
+				break;
+			}
+		}
+	}
+
 #ifndef NO_PLUGINS
-	if(m_dwLastSavedWithVersion < MPT_V("1.22.07.01"))
+	if(m_dwLastSavedWithVersion < MPT_V("1.22.07.01") && hasAnyPlugins)
 	{
 		// Convert ANSI plugin path names to UTF-8 (irrelevant in probably 99% of all cases anyway, I think I've never seen a VST plugin with a non-ASCII file name)
 		for(auto &plugin : m_MixPlugins)
@@ -418,9 +431,11 @@ void CSoundFile::UpgradeModule()
 			// OpenMPT 1.18 fixed the depth of random pan in compatible mode.
 			// OpenMPT 1.26 fixes it in normal mode too.
 			if(!compatModeIT || m_dwLastSavedWithVersion < MPT_V("1.18.00.00"))
-			{
 				ins->nPanSwing = static_cast<uint8>((ins->nPanSwing + 3) / 4u);
-			}
+
+			// Before OpenMPT 1.26 (r6129), it was possible to trigger MIDI notes using channel plugins if the instrument had a valid MIDI channel.
+			if(!ins->nMixPlug && ins->HasValidMIDIChannel() && m_dwLastSavedWithVersion >= MPT_V("1.17.00.00"))
+				m_playBehaviour.set(kMIDINotesFromChannelPlugin);
 		}
 	}
 
@@ -583,6 +598,11 @@ void CSoundFile::UpgradeModule()
 			{ kITPitchPanSeparation,          MPT_V("1.30.00.53") },
 			{ kITResetFilterOnPortaSmpChange, MPT_V("1.30.08.02") },
 			{ kITInitialNoteMemory,           MPT_V("1.31.00.25") },
+			{ kITNoSustainOnPortamento,       MPT_V("1.32.00.13") },
+			{ kITEmptyNoteMapSlotIgnoreCell,  MPT_V("1.32.00.13") },
+			{ kITOffsetWithInstrNumber,       MPT_V("1.32.00.15") },
+			{ kITDoublePortamentoSlides,      MPT_V("1.32.00.27") },
+			{ kITCarryAfterNoteOff,           MPT_V("1.32.00.40") },
 		};
 
 		for(const auto &b : behaviours)
@@ -606,6 +626,8 @@ void CSoundFile::UpgradeModule()
 			{ kFT2NoteDelayWithoutInstr,     MPT_V("1.28.00.44") },
 			{ kITFT2DontResetNoteOffOnPorta, MPT_V("1.29.00.34") },
 			{ kFT2PortaResetDirection,       MPT_V("1.30.00.40") },
+			{ kFT2AutoVibratoAbortSweep,     MPT_V("1.32.00.29") },
+			{ kFT2OffsetMemoryRequiresNote,  MPT_V("1.32.00.43") },
 		};
 
 		for(const auto &b : behaviours)
@@ -724,7 +746,8 @@ void CSoundFile::UpgradeModule()
 		}
 	}
 
-	if(m_dwLastSavedWithVersion >= MPT_V("1.27.00.42") && m_dwLastSavedWithVersion < MPT_V("1.30.00.46") && (GetType() & (MOD_TYPE_IT | MOD_TYPE_MPT | MOD_TYPE_XM)))
+#ifndef NO_PLUGINS
+	if(m_dwLastSavedWithVersion >= MPT_V("1.27.00.42") && m_dwLastSavedWithVersion < MPT_V("1.30.00.46") && hasAnyPlugins)
 	{
 		// The Flanger DMO plugin is almost identical to the Chorus... but only almost.
 		// The effect implementation was the same in OpenMPT 1.27-1.29, now it isn't anymore.
@@ -736,20 +759,26 @@ void CSoundFile::UpgradeModule()
 		}
 	}
 
-	if(m_dwLastSavedWithVersion < MPT_V("1.31.00.09") && (GetType() & (MOD_TYPE_IT | MOD_TYPE_MPT | MOD_TYPE_XM)))
+	if(m_dwLastSavedWithVersion < MPT_V("1.30.00.54") && hasAnyPlugins)
 	{
-		// Old-style plugin tone portamento
-		for(auto &plugin : m_MixPlugins)
+		// Currently active program and bank is assumed to be 1 when starting playback
+		for(INSTRUMENTINDEX i = 1; i <= GetNumInstruments(); i++)
 		{
-			if(plugin.IsValidPlugin())
+			if(Instruments[i] && (Instruments[i]->nMidiProgram == 1 || Instruments[i]->wMidiBank == 1))
 			{
-				m_playBehaviour.set(kPluginIgnoreTonePortamento);
+				m_playBehaviour.set(kPluginDefaultProgramAndBank1);
 				break;
 			}
 		}
 	}
 
-	if(m_dwLastSavedWithVersion >= MPT_V("1.27") && m_dwLastSavedWithVersion < MPT_V("1.30.06.00") && (GetType() & (MOD_TYPE_IT | MOD_TYPE_MPT | MOD_TYPE_XM)))
+	if(m_dwLastSavedWithVersion < MPT_V("1.31.00.09") && hasAnyPlugins)
+	{
+		// Old-style plugin tone portamento
+		m_playBehaviour.set(kPluginIgnoreTonePortamento);
+	}
+
+	if(m_dwLastSavedWithVersion >= MPT_V("1.27") && m_dwLastSavedWithVersion < MPT_V("1.30.06.00") && hasAnyPlugins)
 	{
 		// Fix off-by-one delay length in older Echo DMO emulation
 		for(auto &plugin : m_MixPlugins)
@@ -766,6 +795,31 @@ void CSoundFile::UpgradeModule()
 			}
 		}
 	}
+
+	if(m_dwLastSavedWithVersion >= MPT_V("1.17") && m_dwLastSavedWithVersion < MPT_V("1.32.00.30") && hasAnyPlugins)
+	{
+		for(const auto &plugin : m_MixPlugins)
+		{
+			if(plugin.Info.dwPluginId1 == PLUGMAGIC('V', 's', 't', 'P'))
+			{
+				m_playBehaviour.set(kLegacyPPQpos);
+				break;
+			}
+		}
+	}
+
+	if(m_dwLastSavedWithVersion < MPT_V("1.32.00.38") && hasAnyPlugins)
+	{
+		for(const auto &plugin : m_MixPlugins)
+		{
+			if(plugin.Info.dwPluginId1 == PLUGMAGIC('V', 's', 't', 'P'))
+			{
+				m_playBehaviour.set(kLegacyPluginNNABehaviour);
+				break;
+			}
+		}
+	}
+#endif
 }
 
 OPENMPT_NAMESPACE_END

@@ -11,8 +11,8 @@
 #include "stdafx.h"
 
 #ifndef NO_PLUGINS
-#include "../Sndfile.h"
 #include "SymMODEcho.h"
+#include "../Sndfile.h"
 
 OPENMPT_NAMESPACE_BEGIN
 
@@ -70,7 +70,7 @@ void SymMODEcho::Process(float* pOutL, float* pOutR, uint32 numFrames)
 			{
 				case DSPType::Off:
 					break;
-				case DSPType::Normal:  // Normal
+				case DSPType::Normal:
 					lOut = (lDelay + lDry) * m_feedback;
 					rOut = (rDelay + rDry) * m_feedback;
 					break;
@@ -141,7 +141,7 @@ PlugParamValue SymMODEcho::GetParameter(PlugParamIndex index)
 }
 
 
-void SymMODEcho::SetParameter(PlugParamIndex index, PlugParamValue value)
+void SymMODEcho::SetParameter(PlugParamIndex index, PlugParamValue value, PlayState *, CHANNELINDEX)
 {
 	if(index < kEchoNumParameters)
 	{
@@ -209,15 +209,15 @@ CString SymMODEcho::GetParamDisplay(PlugParamIndex param)
 	switch(static_cast<Parameters>(param))
 	{
 	case kEchoType:
-			switch(GetDSPType())
-			{
-				case DSPType::Off: return _T("Off");
-				case DSPType::Normal: return _T("Normal");
-				case DSPType::Cross: return _T("Cross");
-				case DSPType::Cross2: return _T("Cross 2");
-				case DSPType::Center: return _T("Center");
-				case DSPType::NumTypes: break;
-			}
+		switch(GetDSPType())
+		{
+			case DSPType::Off: return _T("Off");
+			case DSPType::Normal: return _T("Normal");
+			case DSPType::Cross: return _T("Cross");
+			case DSPType::Cross2: return _T("Cross 2");
+			case DSPType::Center: return _T("Center");
+			case DSPType::NumTypes: break;
+		}
 		break;
 	case kEchoDelay:
 		return mpt::cfmt::val(m_chunk.param[kEchoDelay]);
