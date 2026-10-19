@@ -1,6 +1,6 @@
 # stemgen
 
-STEM generator using libopenmpt with glue in Rust
+STEM generator using libopenmpt and nuade (for Amiga formats libopenmpt does not support) with glue in Rust
 
 # Building
 
@@ -26,7 +26,7 @@ Usage: stemgen [OPTIONS] --input <INPUT> --output <OUTPUT>
 
 Options:
   -i, --input <INPUT>
-          Input song or directory of files supported by libopenmpt
+          Input song or directory of files supported by libopenmpt or nuade
 
   -o, --output <OUTPUT>
           Output directory to place the generated files
@@ -147,3 +147,8 @@ Options:
   -V, --version
           Print version
 ```
+
+# Known limitations
+
+- Channel stems of some nuade songs do not sum exactly to the full mix. Players such as hippel7v run their own nonlinear hard clip, and a full mix that clips when written as 16-bit cannot equal the sum of the unclipped stems. Use `--format float` to avoid the latter.
+- Songs that never end are rendered up to 10 minutes.

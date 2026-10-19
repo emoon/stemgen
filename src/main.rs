@@ -1,5 +1,8 @@
+mod engine;
+
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
+use engine::{RenderParams, SampleOutputFormat, Song};
 use indicatif::{ProgressBar, ProgressStyle};
 use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm, MonoPcm};
 use rayon::prelude::*;
@@ -14,12 +17,8 @@ use vorbis_rs::{VorbisBitrateManagementStrategy, VorbisEncoderBuilder};
 use walkdir::WalkDir;
 use wav;
 
-#[repr(C)]
-#[derive(ValueEnum, Debug, Copy, Clone)]
-enum SampleOutputFormat {
-    Flac,
-    Wav,
-}
+// Paula rate of the C-2 period (428) most Amiga players use, for sounds that don't say
+const DEFAULT_SAMPLE_RATE: u32 = 8287;
 
 #[derive(ValueEnum, Debug, Copy, Clone, PartialEq)]
 enum WriteFormat {
@@ -165,81 +164,6 @@ struct Args {
     mp3_quality: Mp3Quality,
 }
 
-#[repr(C)]
-#[derive(Debug)]
-struct SongInfo {
-    channel_count: u32,
-    instrument_count: u32,
-    duration_seconds: f32,
-}
-
-// Has to match the struct in the C code
-#[repr(C)]
-struct RenderParams {
-    sample_rate: u32,
-    bytes_per_sample: u32,
-    channel_to_play: i32, // if -1 use all channels, otherwise pick one channel
-    instrument_to_play: i32, // if -1 use all instruments, otherwise pick one
-    stereo_separation: u32,
-    stereo_separation_enabled: bool,
-    stereo_output: bool,
-}
-
-extern "C" {
-    fn get_song_info_c(
-        data: *const u8,
-        len: u32,
-        sample_output_path: *const u8,
-        sample_format: u32,
-    ) -> SongInfo;
-    fn song_render_c(
-        output: *mut u8,
-        output_len: u32,
-        input_data: *const u8,
-        input_len: u32,
-        params: *const RenderParams,
-    ) -> u32;
-}
-
-fn get_song_info(
-    file_data: &[u8],
-    samples_output_path: Option<&Path>,
-    sample_format: u32,
-) -> SongInfo {
-    if let Some(path) = samples_output_path {
-        let os_path = path.to_string_lossy().into_owned();
-        let c_filename = std::ffi::CString::new(os_path).unwrap();
-        unsafe {
-            get_song_info_c(
-                file_data.as_ptr(),
-                file_data.len() as u32,
-                c_filename.as_ptr() as *const _,
-                sample_format,
-            )
-        }
-    } else {
-        unsafe {
-            get_song_info_c(
-                file_data.as_ptr(),
-                file_data.len() as u32,
-                std::ptr::null(),
-                0,
-            )
-        }
-    }
-}
-fn song_render(output: &mut [u8], input: &[u8], render_params: &RenderParams) -> u32 {
-    unsafe {
-        song_render_c(
-            output.as_mut_ptr(),
-            output.len() as u32,
-            input.as_ptr(),
-            input.len() as u32,
-            render_params,
-        )
-    }
-}
-
 // Get files for a given directory or single filename
 fn get_files(path: &str, recurse: bool) -> Vec<String> {
     if !Path::new(path).exists() {
@@ -277,6 +201,14 @@ fn get_files(path: &str, recurse: bool) -> Vec<String> {
     files
 }
 
+/// Appends the extension instead of replacing one, so a song name with a dot (`viruskillerv2.0pro`) stays whole.
+fn with_audio_extension(path: &Path, extension: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".");
+    name.push(extension);
+    PathBuf::from(name)
+}
+
 fn write_flac_file(
     filename: &Path,
     buffer: Vec<u8>,
@@ -284,7 +216,7 @@ fn write_flac_file(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("flac");
+    let filename = with_audio_extension(filename, "flac");
 
     libflac_sys::encode_flac(
         &filename,
@@ -302,7 +234,7 @@ fn write_wav_file(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("wav");
+    let filename = with_audio_extension(filename, "wav");
 
     let (format, bits) = if bytes_per_sample == 4 {
         (wav::header::WAV_FORMAT_IEEE_FLOAT, 32)
@@ -324,7 +256,7 @@ fn write_wav_file(
 }
 
 fn write_ogg_vorbis(filename: &Path, buffer: Vec<u8>, args: &Args, channel_count: usize) {
-    let filename = PathBuf::from(filename).with_extension("ogg");
+    let filename = with_audio_extension(filename, "ogg");
     let mut out_file = match File::create(&filename) {
         Ok(f) => f,
         Err(e) => {
@@ -432,7 +364,7 @@ fn write_mp3(
     channel_count: usize,
     bytes_per_sample: usize,
 ) {
-    let filename = PathBuf::from(filename).with_extension("mp3");
+    let filename = with_audio_extension(filename, "mp3");
 
     let mut out_file = match File::create(&filename) {
         Ok(f) => f,
@@ -567,15 +499,49 @@ fn write_mp3(
     out_file.write_all(&mp3_out_buffer).unwrap();
 }
 
-fn gen_song(
-    filestem: &str,
-    song_info: &SongInfo,
-    song: &[u8],
+// Writes the sounds of the song to disk. A song that has none to give is skipped, that isn't an error.
+fn export_song_samples(
+    song: &Song,
+    filename: &str,
+    stemname: &str,
+    format: SampleOutputFormat,
     args: &Args,
-    channel: i32,
-    instrument: i32,
-    stereo: bool,
 ) {
+    let stem = Path::new(&args.output).join(stemname);
+
+    let report = song.export_samples(&stem, format, |sample| {
+        let path =
+            Path::new(&args.output).join(format!("{}_sample_{:04}", stemname, sample.index + 1));
+        let rate = if sample.rate == 0 {
+            DEFAULT_SAMPLE_RATE
+        } else {
+            sample.rate
+        };
+        let bytes = bytemuck::cast_slice(&sample.data).to_vec();
+
+        match format {
+            SampleOutputFormat::Flac => write_flac_file(&path, bytes, rate, 1, 2),
+            SampleOutputFormat::Wav => write_wav_file(&path, bytes, rate, 1, 2),
+        }
+    });
+
+    if let Some(player) = report.generated_by {
+        log::warn!(
+            "{}: no samples saved, {} has no sound data to export (empty, generated at run time or not stored as samples)",
+            filename,
+            player
+        );
+    } else if report.skipped > 0 {
+        log::warn!(
+            "{}: {} of {} samples skipped, they have no sound data to export (empty or generated at run time)",
+            filename,
+            report.skipped,
+            report.skipped + report.exported
+        );
+    }
+}
+
+fn gen_song(filestem: &str, song: &Song, args: &Args, channel: i32, instrument: i32, stereo: bool) {
     // Number of bytes needed given a sample depth
     let bytes_per_sample = if args.format == SampleDepth::Float {
         4
@@ -612,12 +578,15 @@ fn gen_song(
 
     let sample_rate = args.sample_rate as usize;
     // We add 5 sec extra to the duration to make sure the buffer is large enough
-    let song_len = song_info.duration_seconds as usize;
+    let song_len = song.info.duration_seconds.ceil() as usize;
 
     let filename = if channel == -1 && instrument == -1 {
         Path::new(&args.output).join(format!("{}", filestem))
     } else if channel == -1 {
         Path::new(&args.output).join(format!("{}_{:04}_chan_full", filestem, instrument + 1))
+    } else if instrument == -1 {
+        // The song doesn't report instruments, so a channel is all there is to split on
+        Path::new(&args.output).join(format!("{}_chan_{:04}", filestem, channel))
     } else {
         Path::new(&args.output).join(format!(
             "{}_{:04}_chan_{:04}",
@@ -635,7 +604,7 @@ fn gen_song(
     let output_size_bytes = song_len * sample_rate * bytes_per_sample as usize * channel_count * 2;
     let mut output_buffer = vec![0u8; output_size_bytes];
 
-    let render_len = song_render(&mut output_buffer, song, &render_params);
+    let render_len = song.render(&mut output_buffer, &render_params);
 
     output_buffer.truncate(render_len as _);
 
@@ -679,7 +648,7 @@ fn gen_song(
 fn main() -> Result<()> {
     let mut args = Args::parse();
     SimpleLogger::new()
-        .with_level(log::LevelFilter::Error)
+        .with_level(log::LevelFilter::Warn)
         .init()?;
 
     let files = get_files(&args.input, args.recursive);
@@ -695,23 +664,25 @@ fn main() -> Result<()> {
         let mut song_buffer = Vec::new();
         file.read_to_end(&mut song_buffer)?;
 
-        let stemname = file_path.file_stem().unwrap().to_str().unwrap();
-
-        println!("Processing file {}", filename);
-
-        let song_info = if let Some(sample_format) = args.song_samples {
-            let sample_path = Path::new(&args.output).join(format!("{}", stemname));
-            get_song_info(&song_buffer, Some(&sample_path), sample_format as _)
-        } else {
-            get_song_info(&song_buffer, None, 0)
-        };
-
-        if song_info.channel_count == 0 || song_info.instrument_count == 0 {
-            log::error!(
-                "Song {} doesn'n contain any channels or instruments so is being skipped!",
-                &filename
-            );
+        let Some(song) = Song::open(&song_buffer, &filename) else {
+            log::error!("Song {} isn't supported by any engine. Skipping", &filename);
             continue;
+        };
+        // Amiga songs use prefix names (`ash.cj in the usa`); the part after the dot is
+        // the song name, so keeping it stops songs from the same author overwriting each other.
+        let stemname = if song.engine_name() == "nuade" {
+            file_path.file_name()
+        } else {
+            file_path.file_stem()
+        }
+        .unwrap()
+        .to_str()
+        .unwrap();
+        println!("Processing file {} ({})", filename, song.engine_name());
+        let song_info = &song.info;
+
+        if let Some(format) = args.song_samples {
+            export_song_samples(&song, &filename, stemname, format, &args);
         }
 
         if song_info.duration_seconds == 0.0 {
@@ -720,7 +691,7 @@ fn main() -> Result<()> {
         }
 
         if args.full {
-            gen_song(&stemname, &song_info, &song_buffer, &args, -1, -1, true);
+            gen_song(&stemname, &song, &args, -1, -1, true);
         }
 
         let mut pb = None;
@@ -730,8 +701,13 @@ fn main() -> Result<()> {
 
         if args.channels {
             let channel_count = song_info.channel_count;
-            let instrument_count = song_info.instrument_count;
-            let total_count = channel_count * instrument_count;
+            // A song without instruments is split on channels only (-1 plays all instruments)
+            let instruments: Vec<i32> = if song.instrument_ids.is_empty() {
+                vec![-1]
+            } else {
+                song.instrument_ids.iter().map(|&id| id as i32).collect()
+            };
+            let total_count = channel_count * instruments.len() as u32;
 
             if args.progress {
                 let p = ProgressBar::new(total_count as u64);
@@ -740,12 +716,11 @@ fn main() -> Result<()> {
             }
 
             (0..total_count).into_par_iter().for_each(|index| {
-                let instrument = index / channel_count;
+                let instrument = instruments[(index / channel_count) as usize];
                 let channel = index % channel_count;
                 gen_song(
                     &stemname,
-                    &song_info,
-                    &song_buffer,
+                    &song,
                     &args,
                     channel as _,
                     instrument as _,
@@ -757,28 +732,24 @@ fn main() -> Result<()> {
                 }
             });
         } else if args.instruments {
+            if song.instrument_ids.is_empty() {
+                log::warn!(
+                    "{}: the song doesn't report any instruments, use --channels to split it",
+                    filename
+                );
+            }
             if args.progress {
                 let p = ProgressBar::new(song_info.instrument_count as u64);
                 p.set_style(spinner_style);
                 pb = Some(p);
             }
-            (0..song_info.instrument_count)
-                .into_par_iter()
-                .for_each(|instrument| {
-                    gen_song(
-                        &stemname,
-                        &song_info,
-                        &song_buffer,
-                        &args,
-                        -1,
-                        instrument as _,
-                        args.stereo,
-                    );
+            song.instrument_ids.par_iter().for_each(|&instrument| {
+                gen_song(&stemname, &song, &args, -1, instrument as _, args.stereo);
 
-                    if let Some(p) = &pb {
-                        p.inc(1);
-                    }
-                });
+                if let Some(p) = &pb {
+                    p.inc(1);
+                }
+            });
         }
     }
 
