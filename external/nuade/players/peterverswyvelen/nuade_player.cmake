@@ -1,0 +1,1 @@
+set(NUADE_PLAYER_SOURCES peterverswyvelen.c peterverswyvelen_nuade.c)

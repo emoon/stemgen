@@ -1,0 +1,15 @@
+set(NUADE_PLAYER_SOURCES
+    mm4.c
+    mm8.c
+    mm8_mix020.c
+    mm8_mix68k.c
+    mm8_mixer.c
+    mm_block.c
+    mm_effects.c
+    mm_event.c
+    mm_file.c
+    mm_instruments.c
+    mm_song.c
+    mm_tables.c
+    musicmaker.c
+    musicmaker_nuade.c)

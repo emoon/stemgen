@@ -1,0 +1,1 @@
+set(NUADE_PLAYER_SOURCES legglessmusiceditor.c lme_module.c legglessmusiceditor_nuade.c)

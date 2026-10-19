@@ -1,0 +1,1 @@
+set(NUADE_PLAYER_SOURCES musicalenlightenment.c musicalenlightenment_nuade.c)
