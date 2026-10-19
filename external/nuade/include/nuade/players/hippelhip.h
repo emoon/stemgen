@@ -224,6 +224,12 @@ bool hh_start(HhPlayer* player, int subsong, NuadeVoices* voices);
 
 HhTickResult hh_tick(HhPlayer* player, NuadeVoices* voices);
 
+// The records of the sample table, and the PCM of one (`n` is the sample number the frequency sequences use). False for
+// a record that has no PCM inside the module (empty, or a sample pack).
+uint32_t hh_sample_count(const HhPlayer* player);
+bool hh_sample_pcm(const HhPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames);
+
 // Ticks per sequencer step of the running subsong.
 int hh_speed(const HhPlayer* player);
 

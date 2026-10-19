@@ -263,6 +263,88 @@ bool mon_locate(const uint8_t* bytes, size_t size, MonModule* out) {
     return mon_walk_songs(out);
 }
 
+// The first wave of a wave list: the wave a note-on starts with (the list goes on through its other waves). The
+// address of the wave and its length in words; false when the list has none.
+static bool first_wave(const MonModule* m, const MonInstrument* ins, uint32_t* address, uint32_t* length_words) {
+    const uint32_t list = mon_song_address(m, ins->wave_list);
+    if (m->layout->version == MonVersion_MysteryWorldsEnd) {
+        uint32_t pos = 0;
+        while (pos < MON_LIST_GUARD) {
+            const uint8_t byte = mon_u8(m, list + pos);
+            if (byte != MON_NEW_WAVE_SPEED) {
+                if (byte == MON_NEW_WAVE_JUMP) {
+                    return false;
+                }
+                const MonWave wave = mon_read_wave(m, byte);
+                *address = mon_song_address(m, wave.offset);
+                *length_words = wave.length_words;
+                return true;
+            }
+            pos += 2;
+        }
+        return false;
+    }
+    // the older versions: the length is set by a command in front of the wave
+    uint32_t pos = 0;
+    uint32_t length = 0;
+    while (pos < MON_LIST_GUARD) {
+        const uint16_t entry = mon_u16(m, list + pos);
+        if (entry == MON_OLD_WAVE_SET_LENGTH) {
+            length = mon_u16(m, list + pos + MON_OLD_WAVE_BYTES);
+        } else if (entry == MON_OLD_WAVE_JUMP) {
+            return false;
+        } else if (entry != MON_OLD_WAVE_SET_PERIOD) {
+            *address = mon_song_address(m, entry);
+            *length_words = length;
+            return true;
+        }
+        pos += MON_OLD_WAVE_COMMAND_BYTES;
+    }
+    return false;
+}
+
+bool mon_instrument_pcm(const MonPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames) {
+    const MonModule* m = &player->module;
+    if (number >= m->instrument_count) {
+        return false;
+    }
+    const MonInstrument ins = mon_read_instrument(m, m->instruments + number * MON_INSTRUMENT_BYTES);
+    // the sample kind of each version; the other kind plays a list of waves
+    const MonVersion version = m->layout->version;
+    const bool sample = mon_is_old_version(version) ? ins.kind == 0
+                                                    : (ins.kind != 0 || version == MonVersion_DragonWars);
+    uint32_t start = m->songs + ins.sample;
+    uint32_t length_words = ins.length_words;
+    if (!sample && !first_wave(m, &ins, &start, &length_words)) {
+        return false;
+    }
+    if (length_words == 0 || start >= m->size) {
+        return false;
+    }
+    const uint32_t even = start & ~1u;
+    uint32_t length = length_words * 2;
+    if (length > m->size - even) {
+        length = m->size - even;
+    }
+    *data = (const int8_t*)(m->bytes + even);
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    if (!sample) {
+        // a wave repeats until the list moves on
+        *loop_frames = length;
+    } else if (ins.loop_start != MON_NO_LOOP && ins.loop_start < ins.length_words) {
+        const uint32_t skip = (uint32_t)(int32_t)(int16_t)ins.loop_start;
+        const uint32_t from = version == MonVersion_Gyroscope ? skip : skip * 2;
+        if (from < length) {
+            *loop_start = from;
+            *loop_frames = length - from;
+        }
+    }
+    return true;
+}
+
 uint32_t mon_song_address(const MonModule* m, uint16_t offset) {
     return m->songs + (uint32_t)(int32_t)(int16_t)offset;
 }

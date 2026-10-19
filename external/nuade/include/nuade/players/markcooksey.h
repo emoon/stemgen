@@ -126,6 +126,14 @@ McTickResult mc_tick(McPlayer* player, NuadeVoices* voices);
 
 McVoiceState mc_voice_state(const McPlayer* player, int voice);
 
+// The instruments the table holds: it ends where the first record starts (a record is addressed from its entry).
+uint32_t mc_instrument_count(const McPlayer* player);
+
+// The PCM of instrument `number`: its first block, with the repeat block when that follows it or lies inside it.
+// False for an instrument without a sample (a note that only retunes the running one).
+bool mc_instrument_pcm(const McPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 McPlayer* mc_from_nuade(NuadeSong* song);
 

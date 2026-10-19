@@ -19,6 +19,7 @@ extern "C" {
 
 #define FT_VOICES 4
 #define FT_ROWS 64
+#define FT_INSTRUMENTS 16 // the slots a cell can name
 
 // The CIA clock: the timebase of FT_TICK_LENGTH.
 #define FT_TIMEBASE_HZ 709379
@@ -104,6 +105,10 @@ FtPosition ft_position(const FtPlayer* player);
 int ft_order_count(const FtPlayer* player);
 
 FtVoiceState ft_voice_state(const FtPlayer* player, int voice);
+
+// The PCM of instrument slot `slot` (0 .. FT_INSTRUMENTS - 1): signed 8 bit, `bytes` long, `loops` when the voice
+// repeats all of it (otherwise it plays once). False for a slot whose sample is empty or outside the file.
+bool ft_instrument_pcm(const FtPlayer* player, int slot, const int8_t** data, uint32_t* bytes, bool* loops);
 
 // `order` 0 .. ft_order_count - 1, `voice` 0..3, `row` 0 .. FT_ROWS - 1.
 FtCell ft_pattern_cell(const FtPlayer* player, int order, int voice, int row);

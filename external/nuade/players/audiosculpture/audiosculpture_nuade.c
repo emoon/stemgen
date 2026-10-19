@@ -170,6 +170,29 @@ static uint32_t audiosculpture_tracker_cells(void* user_data, const NuadePositio
                               user_data);
 }
 
+static uint32_t audiosculpture_sample_count(void* user_data) {
+    (void)user_data;
+    return ASC_INSTRUMENTS;
+}
+
+// Entry n is instrument number n + 1, the number the voice info and the instrument names have.
+static bool audiosculpture_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    const char* name;
+    if (!asc_sample_pcm((const AscPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length, &name)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n + 1,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_audiosculpture = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "audiosculpture",
@@ -186,6 +209,8 @@ const NuadePlayer nuade_player_audiosculpture = {
     .voice_info = audiosculpture_voice_info,
     .tracker_info = audiosculpture_tracker_info,
     .tracker_cells = audiosculpture_tracker_cells,
+    .sample_count = audiosculpture_sample_count,
+    .sample_get = audiosculpture_sample_get,
 };
 
 AscPlayer* asc_from_nuade(NuadeSong* song) {

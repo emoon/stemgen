@@ -68,6 +68,23 @@ static uint32_t andersoland_grid_ticks(void* user_data, uint32_t subsong) {
     return ao_grid_ticks((const AoPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t andersoland_sample_count(void* user_data) {
+    return (uint32_t)ao_sample_count((const AoPlayer*)user_data);
+}
+
+// Entry n is instrument n, the number the voice info reports.
+static bool andersoland_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!ao_sample_pcm((const AoPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_andersoland = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "andersoland",
@@ -82,6 +99,8 @@ const NuadePlayer nuade_player_andersoland = {
     .metadata = andersoland_metadata,
     .voice_info = andersoland_voice_info,
     .grid_ticks = andersoland_grid_ticks,
+    .sample_count = andersoland_sample_count,
+    .sample_get = andersoland_sample_get,
 };
 
 AoPlayer* ao_from_nuade(NuadeSong* song) {

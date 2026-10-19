@@ -3065,6 +3065,43 @@ const char* sonix_song_get_instrument_name(const SonixSong* song, u8 instrument_
     return song->instrument_names[instrument_index];
 }
 
+bool sonix_song_instrument_pcm(const SonixSong* song, u8 instrument_index, SonixInstrumentPcm* out) {
+    if (song == nullptr || instrument_index >= SONIX_INSTRUMENTS) {
+        return false;
+    }
+    const u8 inst = instrument_index;
+    // the same order as a note start: synth, zones, sample
+    if (song->instrument_is_synth[inst] && song->synth_wave_set[inst]) {
+        *out = (SonixInstrumentPcm) { .data = song->synth_wave[inst], .frames = 128, .loop_frames = 128 };
+        return true;
+    }
+    if (song->inst_zone_count[inst] > 0) {
+        const SonixInstZone* z = &song->inst_zones[inst][0];
+        if (z->pcm == nullptr || z->pcm_len == 0) {
+            return false;
+        }
+        *out = (SonixInstrumentPcm) { .data = z->pcm,
+                                      .frames = z->pcm_len,
+                                      .rate = z->source_rate,
+                                      .loop_start = z->loop_start,
+                                      .loop_frames = z->loop_len };
+        return true;
+    }
+    if (song->instrument_pcm[inst] == nullptr || song->instrument_pcm_len[inst] == 0) {
+        return false;
+    }
+    u32 rate = song->instrument_source_rate[inst];
+    if (rate < 4000u) {
+        rate = song->instrument_base_period[inst] > 0 ? 0x369E99u / song->instrument_base_period[inst] : 0;
+    }
+    *out = (SonixInstrumentPcm) { .data = song->instrument_pcm[inst],
+                                  .frames = song->instrument_pcm_len[inst],
+                                  .rate = rate,
+                                  .loop_start = song->instrument_loop_start[inst],
+                                  .loop_frames = song->instrument_loop_len[inst] };
+    return true;
+}
+
 u32 sonix_song_get_debug_note_events(const SonixSong* song) {
     if (song == nullptr) {
         return 0;

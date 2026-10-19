@@ -211,6 +211,11 @@ void asc_title(const AscPlayer* player, char out[ASC_TITLE_SIZE]);
 // Instrument name for index 0..30, "" if out of range.
 void asc_sample_name(const AscPlayer* player, int index, char out[ASC_NAME_SIZE]);
 
+// The PCM of instrument `index` (0..30, number index + 1), in bytes, and its name (valid until asc_destroy). False for
+// a synth instrument (its sound is a wave form of the replayer) and for an empty sample.
+bool asc_sample_pcm(const AscPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length, const char** name);
+
 // The row whose notes were started by the last tick that played a row.
 AscPosition asc_position(const AscPlayer* player);
 // Entries of the order list.

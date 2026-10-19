@@ -127,6 +127,27 @@ static uint32_t oktalyzer_tracker_cells(void* user_data, const NuadePosition* at
                               oktalyzer_cell, module);
 }
 
+static uint32_t oktalyzer_sample_count(void* user_data) {
+    return (uint32_t)okt_get_instrument_count((const OktModule*)user_data);
+}
+
+static bool oktalyzer_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const OktModule* module = (const OktModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!okt_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = okt_instrument_name(module, (int)n),
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_oktalyzer = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "oktalyzer",
@@ -143,6 +164,8 @@ const NuadePlayer nuade_player_oktalyzer = {
     .voice_info = oktalyzer_voice_info,
     .tracker_info = oktalyzer_tracker_info,
     .tracker_cells = oktalyzer_tracker_cells,
+    .sample_count = oktalyzer_sample_count,
+    .sample_get = oktalyzer_sample_get,
 };
 
 OktModule* okt_from_nuade(NuadeSong* song) {

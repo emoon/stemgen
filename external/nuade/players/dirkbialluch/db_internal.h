@@ -141,4 +141,6 @@ uint32_t db_sample_address(const DbModule* m, uint8_t index);
 
 // AUDxLC for an address: null when it is not inside the sample file. Any AUDxLEN can follow it: the file's bytes after
 // the sample play as in the original, and what runs past the end of the file plays the zeros behind its padded copy.
+// The sample a program selects, and its length in bytes: see db_program_pcm.
+bool db_module_program_pcm(const DbModule* m, uint8_t program, const int8_t** data, uint32_t* length);
 const int8_t* db_sample_lc(const DbModule* m, uint32_t address);

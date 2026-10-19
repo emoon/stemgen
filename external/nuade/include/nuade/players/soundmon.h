@@ -235,6 +235,9 @@ void sm_get_cell(const SmModule* module, int track_idx, int row, uint8_t* note, 
 void sm_set_cell(SmModule* module, int track_idx, int row, uint8_t note, uint8_t instrument, uint8_t effect,
                  uint8_t effect_arg);
 const char* sm_get_instrument_name(const SmModule* module, int inst);
+// The PCM of a sample instrument (inst 0..14). False for a synth instrument or an empty sample.
+bool sm_instrument_pcm(const SmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
 float sm_get_instrument_param(const SmModule* module, int inst, const char* param);
 void sm_set_instrument_param(SmModule* module, int inst, const char* param, float value);
 size_t sm_export(const SmModule* module, uint8_t* out, size_t max_size);

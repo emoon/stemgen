@@ -279,6 +279,23 @@ Is2Position is2_position(const Is2Module* module);
 int is2_position_count(const Is2Module* module);
 // Rows per position of the subsong until a track length effect changes it.
 int is2_default_rows(const Is2Module* module);
+// The sounds the module holds as PCM: the sample instruments (n = 0 .. num_samples - 1), then the synth instruments.
+// Sample and synth instruments are numbered apart in the format (a track byte of 64 or more picks a sample), so the
+// synth ones are given the numbers IS2_FIRST_SYNTH_INSTRUMENT.. to keep the sample ones' numbers (the ones the voices
+// report) unique.
+#define IS2_FIRST_SYNTH_INSTRUMENT 64
+
+typedef struct Is2SoundPcm {
+    uint32_t instrument; // see above
+    const int8_t* data;
+    uint32_t length; // bytes
+    uint32_t loop_start;
+    uint32_t loop_length; // 0 = no loop
+} Is2SoundPcm;
+
+int is2_sound_count(const Is2Module* module);
+// False for a sound without data.
+bool is2_sound_pcm(const Is2Module* module, int n, Is2SoundPcm* out);
 Is2VoiceState is2_voice_state(const Is2Module* module, int voice);
 // The line of `channel` at `row` of `position`; all 0 outside the song.
 Is2Cell is2_pattern_cell(const Is2Module* module, int position, int channel, int row);

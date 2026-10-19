@@ -124,6 +124,32 @@ static bool repeat_is_written(const PsPlayer* player, uint32_t index) {
     return (pointer_low_byte & PS_REPEAT_SKIP_BIT) == 0;
 }
 
+// The instruments are the ranges of all the tables the song selects, numbered one after the other in the order the
+// tables were found (collect_range_tables), so that a number names one sound whichever table a voice plays from.
+
+static uint32_t range_table_size(const PsPlayer* player, uint32_t table) {
+    uint16_t count = 0;
+    return ps_u16(&player->module, player->range_tables[table], &count) ? count : 0;
+}
+
+// The instrument number of the first range of table `table`; one past the last range for table_count.
+static uint32_t range_table_base(const PsPlayer* player, uint32_t table) {
+    uint32_t base = 0;
+    for (uint32_t t = 0; t < table; t++) {
+        base += range_table_size(player, t);
+    }
+    return base;
+}
+
+static uint32_t instrument_number(const PsPlayer* player, uint32_t table_offset, uint32_t range) {
+    for (uint32_t t = 0; t < player->range_table_count; t++) {
+        if (player->range_tables[t] == table_offset) {
+            return range_table_base(player, t) + range;
+        }
+    }
+    return range; // a table the dry run did not find
+}
+
 // A note: the instrument range it falls in gives the sample, the length of the sample, and the period table index
 // (the note counted from the range's base).
 
@@ -158,7 +184,7 @@ static void start_note(PsPlayer* player, uint32_t index, uint8_t note) {
         paula->len_words = range.length_words;
         paula->period = (uint16_t)(pair.current >> 16);
         voice->period = paula->period;
-        voice->instrument = (int)i;
+        voice->instrument = (int)instrument_number(player, voice->ranges, i);
         nuade_paula_channel_dma_on(paula);
         if (repeat_is_written(player, index)) {
             paula->lc = ps_idle_sample();
@@ -447,6 +473,48 @@ static bool tempo_runs(PsPlayer* player) {
     return false;
 }
 
+// Commands one subsong is run for when the instrument tables are collected: a song that never loops or ends within it
+// (about 33 minutes) is left as far as it got.
+#define PS_SCAN_TICKS 100000u
+
+static void add_range_table(PsPlayer* player, uint32_t table) {
+    for (uint32_t i = 0; i < player->range_table_count; i++) {
+        if (player->range_tables[i] == table) {
+            return;
+        }
+    }
+    if (player->range_table_count < PS_MAX_RANGE_TABLES) {
+        player->range_tables[player->range_table_count++] = table;
+    }
+}
+
+// The instrument tables the songs select. The replayer only reads the image, so a run on a copy of the player leaves
+// the module alone.
+static void collect_range_tables(PsPlayer* player) {
+    PsPlayer* run = malloc(sizeof(*run));
+    if (run == nullptr) {
+        return;
+    }
+    for (uint32_t subsong = 0; subsong < player->module.subsong_count; subsong++) {
+        *run = *player;
+        if (!ps_start(run, subsong, nullptr)) {
+            continue;
+        }
+        for (uint32_t tick = 0; tick < PS_SCAN_TICKS; tick++) {
+            const PsTickResult result = ps_tick(run, nullptr);
+            for (uint32_t v = 0; v < PS_VOICES; v++) {
+                if (run->voices[v].has_ranges) {
+                    add_range_table(player, run->voices[v].ranges);
+                }
+            }
+            if (result.looped || result.ended) {
+                break;
+            }
+        }
+    }
+    free(run);
+}
+
 PsPlayer* ps_create(const uint8_t* data, size_t size) {
     PsPlayer* player = calloc(1, sizeof(*player));
     if (player == nullptr) {
@@ -456,6 +524,7 @@ PsPlayer* ps_create(const uint8_t* data, size_t size) {
         free(player);
         return nullptr;
     }
+    collect_range_tables(player);
     return player;
 }
 
@@ -529,6 +598,36 @@ PsTickResult ps_tick(PsPlayer* player, NuadeVoices* voices) {
         }
     }
     return (PsTickResult) { .length = player->timer, .looped = player->song_end, .ended = player->fault || finished };
+}
+
+uint32_t ps_instrument_count(const PsPlayer* player) {
+    return range_table_base(player, player->range_table_count);
+}
+
+bool ps_instrument_pcm(const PsPlayer* player, uint32_t index, const int8_t** data, uint32_t* length) {
+    const PsModule* module = &player->module;
+    uint32_t base = 0;
+    for (uint32_t t = 0; t < player->range_table_count; t++) {
+        const uint32_t count = range_table_size(player, t);
+        if (index >= base + count) {
+            base += count;
+            continue;
+        }
+        PsRange range = { 0 };
+        const uint32_t range_at = player->range_tables[t] + PS_RANGE_FIRST + (index - base) * PS_RANGE_BYTES;
+        if (!ps_range(module, range_at, &range)) {
+            return false;
+        }
+        const uint32_t sample = (range_at + (uint32_t)range.sample_offset) & ~1u; // Paula ignores bit 0 of AUDxLC
+        if (sample >= module->size || range.length_words == 0) {
+            return false;
+        }
+        const uint32_t bytes = 2u * range.length_words;
+        *data = (const int8_t*)module->mem + sample;
+        *length = bytes < module->size - sample ? bytes : module->size - sample;
+        return true;
+    }
+    return false;
 }
 
 PsVoiceState ps_voice_state(const PsPlayer* player, uint32_t voice) {

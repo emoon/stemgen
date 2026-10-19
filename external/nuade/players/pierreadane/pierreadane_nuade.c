@@ -81,6 +81,24 @@ static uint32_t pierreadane_grid_ticks(void* user_data, uint32_t subsong) {
     return PA_GRID_TICKS;
 }
 
+static uint32_t pierreadane_sample_count(void* user_data) {
+    // the instruments count from 1, as the voices report them; entry 0 is none
+    return ((const PaPlayer*)user_data)->module.instrument_count + 1;
+}
+
+static bool pierreadane_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const PaPlayer* player = (const PaPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!pa_sample_pcm(player, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_pierreadane = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "pierreadane",
@@ -95,6 +113,8 @@ const NuadePlayer nuade_player_pierreadane = {
     .metadata = pierreadane_metadata,
     .voice_info = pierreadane_voice_info,
     .grid_ticks = pierreadane_grid_ticks,
+    .sample_count = pierreadane_sample_count,
+    .sample_get = pierreadane_sample_get,
 };
 
 PaPlayer* pa_from_nuade(NuadeSong* song) {

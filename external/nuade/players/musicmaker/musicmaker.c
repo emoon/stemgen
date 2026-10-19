@@ -81,6 +81,26 @@ MmVoiceState mm_voice_state(const MmPlayer* player, uint32_t track) {
     return (MmVoiceState) { .note = t->note, .instrument = t->instrument, .note_starts = t->note_starts };
 }
 
+bool mm_sample_pcm(const MmPlayer* player, uint32_t slot, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    const MmInstruments* in = &player->instruments;
+    if (slot >= MM_INSTRUMENTS || in->record[slot].length == 0 || in->sample[slot] >= in->block.size) {
+        return false;
+    }
+    const MmSampleRecord* record = &in->record[slot];
+    const bool four = player->variant != MmVariant_8V;
+    // the 4 voice replayer loops a note that has a first part, the 8 voice one a sample with a repeat
+    const bool loops
+        = record->loop_length > 1 && (!four || record->first_length != 0) && record->loop_offset < record->length;
+    const uint32_t repeat = (uint32_t)record->loop_length * 2;
+    const uint32_t tail = (uint32_t)record->length - record->loop_offset;
+    *data = (const int8_t*)in->storage + in->sample[slot];
+    *length = record->length;
+    *loop_start = loops ? record->loop_offset : 0;
+    *loop_length = loops ? (repeat < tail ? repeat : tail) : 0;
+    return true;
+}
+
 const char* mm_title(const MmPlayer* player) {
     return player->song.title;
 }

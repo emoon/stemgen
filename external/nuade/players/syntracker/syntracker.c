@@ -721,6 +721,47 @@ const char* stk_instrument_name(const StkPlayer* player, int instrument) {
     return instrument >= 0 && instrument < STK_INSTRUMENTS ? player->names[instrument] : "";
 }
 
+bool stk_instrument_pcm(const StkPlayer* player, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                        uint32_t* loop_frames) {
+    const StkModule* m = &player->module;
+    if (inst < 0 || inst >= STK_INSTRUMENTS) {
+        return false;
+    }
+    const Instrument ins = instrument_at(m, (uint8_t)inst);
+    const uint64_t base = (uint64_t)ins.data + m->sample_base;
+    *loop_start = 0;
+    *loop_frames = 0;
+    if (inst < STK_SYNTH_INSTRUMENTS) {
+        // The wave the synth instrument starts from: one cycle, that the morph and the filter change while it plays.
+        if (ins.length == 0 || base + STK_WAVE_SIZE > m->size) {
+            return false;
+        }
+        *data = (const int8_t*)m->data + base;
+        *frames = STK_WAVE_SIZE;
+        *loop_frames = STK_WAVE_SIZE;
+        return true;
+    }
+    // A sample plays its first part once and then repeats the repeat part (which lies in the same data).
+    const uint64_t start = base + ins.start;
+    uint64_t end = start + (uint64_t)ins.length * 2;
+    if (ins.length == 0 || end > m->size) {
+        return false;
+    }
+    if (ins.repeat_length > 1 && ins.repeat_start >= ins.start) {
+        const uint64_t repeat_end = base + ins.repeat_start + (uint64_t)ins.repeat_length * 2;
+        if (repeat_end <= m->size) {
+            *loop_start = (uint32_t)(ins.repeat_start - ins.start);
+            *loop_frames = (uint32_t)ins.repeat_length * 2;
+            if (repeat_end > end) {
+                end = repeat_end;
+            }
+        }
+    }
+    *data = (const int8_t*)m->data + start;
+    *frames = (uint32_t)(end - start);
+    return true;
+}
+
 StkPosition stk_position(const StkPlayer* player) {
     const StkSong* s = &player->song;
     return (StkPosition) { .order = s->shown_position, .row = s->shown_row, .speed = s->speed };

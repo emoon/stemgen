@@ -119,6 +119,28 @@ static uint32_t amos_nuade_tracker_cells(void* user_data, const NuadePosition* a
                               user_data);
 }
 
+static uint32_t amos_nuade_sample_count(void* user_data) {
+    return (uint32_t)amos_sample_count((const AmosPlayer*)user_data);
+}
+
+static bool amos_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const AmosPlayer* player = (const AmosPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!amos_sample_pcm(player, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = amos_sample_name(player, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_amos = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "amos",
@@ -135,6 +157,8 @@ const NuadePlayer nuade_player_amos = {
     .voice_info = amos_nuade_voice_info,
     .tracker_info = amos_nuade_tracker_info,
     .tracker_cells = amos_nuade_tracker_cells,
+    .sample_count = amos_nuade_sample_count,
+    .sample_get = amos_nuade_sample_get,
 };
 
 AmosPlayer* amos_from_nuade(NuadeSong* song) {

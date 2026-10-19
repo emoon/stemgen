@@ -125,6 +125,12 @@ bool ig_start(IgPlayer* player, NuadeVoices* voices);
 IgTickResult ig_tick(IgPlayer* player, NuadeVoices* voices);
 IgVoiceState ig_voice_state(const IgPlayer* player, int voice);
 
+// The entries of the sample file's table, and the PCM of one (`n` is the number the sample command gives). False for
+// an entry that has no PCM inside the file.
+uint32_t ig_sample_count(const IgPlayer* player);
+bool ig_sample_pcm(const IgPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 IgPlayer* ig_from_nuade(NuadeSong* song);
 

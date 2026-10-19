@@ -296,6 +296,10 @@ const char* syn_format_name(const SynModule* module);
 
 // Edit API
 int syn_get_instrument_count(const SynModule* module);
+// The PCM of instrument `inst` (0-based; the instrument number less 1), 8 bit: the sample a sample instrument plays, or
+// the waveform a synth instrument starts from (one looped cycle). False for an instrument without data.
+bool syn_instrument_pcm(const SynModule* module, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                        uint32_t* loop_frames);
 int syn_get_num_track_lines(const SynModule* module);
 int syn_get_num_positions(const SynModule* module);
 

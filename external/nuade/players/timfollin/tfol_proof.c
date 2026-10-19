@@ -42,8 +42,9 @@ typedef struct TfolProof {
     uint32_t next_state; // the next state to walk
     uint64_t steps;
     TfolSong song_record;
-    bool instrument_ok[256]; // instrument table entries of the song that were checked
-    bool instrument_used[256];
+    bool instrument_ok[TFOL_INSTRUMENTS]; // instrument table entries of the song that were checked
+    bool instrument_used[TFOL_INSTRUMENTS];
+    bool first_song_instruments[TFOL_INSTRUMENTS]; // instrument_ok after the walk of the first subsong's song
     bool failed;
 } TfolProof;
 
@@ -266,6 +267,9 @@ static bool tfol_proof_song(TfolProof* proof, uint32_t song) {
             return false;
         }
     }
+    if (song == tfol_song_of_subsong(0)) {
+        memcpy(proof->first_song_instruments, proof->instrument_ok, sizeof(proof->first_song_instruments));
+    }
     return tfol_proof_mark_sweeps(proof);
 }
 
@@ -318,7 +322,7 @@ static bool tfol_proof_run(TfolProof* proof) {
     return clean;
 }
 
-bool tfol_module_prove(const TfolModule* module) {
+bool tfol_module_prove(TfolModule* module) {
     const size_t bits = (module->size + 7) / 8;
     TfolProof proof = { .module = module };
     proof.read = (uint8_t*)calloc(bits, 1);
@@ -329,6 +333,9 @@ bool tfol_module_prove(const TfolModule* module) {
     proof.index = (int32_t*)malloc(TFOL_PROOF_STATES * 2 * sizeof(int32_t));
     const bool ok = proof.read && proof.sample && proof.written && proof.swept && proof.states && proof.index
                     && tfol_proof_run(&proof);
+    if (ok) {
+        memcpy(module->instrument_known, proof.first_song_instruments, sizeof(module->instrument_known));
+    }
     free(proof.read);
     free(proof.sample);
     free(proof.written);

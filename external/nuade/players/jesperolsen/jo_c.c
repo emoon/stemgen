@@ -569,3 +569,67 @@ JoVoiceState jo_c_voice_state(const JoC* c, int voice) {
     return jo_shown_state(v != nullptr && v->started && v->note != JoNote_Silent, c->paula[voice].period,
                           v != nullptr ? v->instrument & 0xff : -1);
 }
+
+// Instrument export. The instrument tables are tables of words that locate the instrument records; a table ends where
+// the first record starts. The song lists name the tables; an instrument number is taken from the first table that has
+// it.
+
+#define MAX_INSTRUMENTS 256u
+
+static uint32_t table_length(const JoModule* m, uint32_t table) {
+    uint32_t first_record = table + 2u * MAX_INSTRUMENTS;
+    uint32_t count = 0;
+    while (count < MAX_INSTRUMENTS && table + 2u * count < first_record) {
+        const uint32_t record = jom_u16(m, table + 2u * count);
+        first_record = record < first_record ? record : first_record;
+        count++;
+    }
+    return count;
+}
+
+// The instrument table of list entry `n` over all the lists (0: none left)
+static uint32_t nth_table(const JoModule* m, uint32_t n) {
+    const int lists = jom_u16(m, 0) / 2;
+    uint32_t seen = 0;
+    for (int list = 0; list < lists; list++) {
+        uint32_t at = list_offset(m, list);
+        for (int e = 0; e < 4 * JO_VOICES && jom_u16(m, at) != JoWord_End; e++, at += LIST_ENTRY_SIZE) {
+            const ListEntry entry = read_list_entry(m, at);
+            if (entry.track == 0) {
+                continue;
+            }
+            if (seen++ == n) {
+                return entry.instrument_table;
+            }
+        }
+    }
+    return 0;
+}
+
+uint32_t jo_c_instrument_count(const JoModule* m) {
+    uint32_t count = 0;
+    for (uint32_t n = 0, table = nth_table(m, 0); table != 0; table = nth_table(m, ++n)) {
+        const uint32_t length = table_length(m, table);
+        count = length > count ? length : count;
+    }
+    return count;
+}
+
+bool jo_c_instrument_sound(const JoModule* m, uint32_t number, JoSound* out) {
+    for (uint32_t n = 0, table = nth_table(m, 0); table != 0; table = nth_table(m, ++n)) {
+        if (number >= table_length(m, table)) {
+            continue;
+        }
+        const Instrument instrument = read_instrument(m, jom_u16(m, table + 2u * number));
+        if ((instrument.wave & WAVE_IS_SVX) != 0) {
+            const uint32_t body = instrument.wave & ~WAVE_IS_SVX;
+            const SvxHeader svx = read_svx_header(m, body);
+            const uint32_t repeat = svx.repeat > 2 ? svx.repeat : 0;
+            return jo_make_sound(m, body, (uint32_t)svx.one_shot + svx.repeat, body + svx.one_shot, repeat, out);
+        }
+        // a length of 0 words would play 128K: not a sound of the module
+        return jo_make_sound(m, instrument.wave, 2u * instrument.length, instrument.loop_start,
+                             instrument.loop_length > 1 ? 2u * instrument.loop_length : 0, out);
+    }
+    return false;
+}

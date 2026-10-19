@@ -1635,6 +1635,29 @@ int sd2_get_instrument_count(const Sd2Module* mod) {
     return mod->instrument_count;
 }
 
+bool sd2_instrument_pcm(const Sd2Module* mod, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length) {
+    if (mod == nullptr || instrument < 0 || instrument >= mod->instrument_count) {
+        return false;
+    }
+    // A note starts the first sample of the instrument's waveform list.
+    const Sd2Instrument* inst = &mod->instruments[instrument];
+    if (inst->waveform_list_number >= mod->waveform_count) {
+        return false;
+    }
+    const uint8_t number = mod->waveform_info[inst->waveform_list_number][0];
+    if (number >= mod->sample_count || mod->samples[number].length == 0) {
+        return false;
+    }
+    const Sd2Sample* smp = &mod->samples[number];
+    *data = smp->sample_data;
+    *length = smp->length;
+    // a loop of two bytes or less is no loop
+    *loop_start = smp->loop_length > 2 ? smp->loop_start : 0;
+    *loop_length = smp->loop_length > 2 ? smp->loop_length : 0;
+    return true;
+}
+
 void sd2_preview_note_on(Sd2Module* mod, int instrument, int note, int velocity) {
     if (mod == nullptr)
         return;

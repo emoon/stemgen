@@ -63,6 +63,25 @@ static uint32_t soundmaster_grid_ticks(void* user_data, uint32_t subsong) {
     return (uint32_t)smst_ticks_per_row((const SmstPlayer*)user_data);
 }
 
+static uint32_t soundmaster_sample_count(void* user_data) {
+    return (uint32_t)smst_instrument_count((const SmstPlayer*)user_data);
+}
+
+static bool soundmaster_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!smst_instrument_pcm((const SmstPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundmaster = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundmaster",
@@ -76,6 +95,8 @@ const NuadePlayer nuade_player_soundmaster = {
     .tick = soundmaster_tick,
     .metadata = soundmaster_metadata,
     .voice_info = soundmaster_voice_info,
+    .sample_count = soundmaster_sample_count,
+    .sample_get = soundmaster_sample_get,
     .grid_ticks = soundmaster_grid_ticks,
 };
 

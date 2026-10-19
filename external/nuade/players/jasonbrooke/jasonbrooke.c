@@ -118,6 +118,88 @@ int jb_ticks_per_step(const JbPlayer* player) {
     return tempo > 0 ? (256 + tempo / 2) / tempo : 1;
 }
 
+// Sound export. Version A: the table of JB_A_SAMPLE_SIZE byte records, which has no count of its own. It ends where the
+// sample data behind it starts, or at the first record that points outside the module. Version B: the bank of 128 byte
+// blocks, which ends where the next table of the driver starts.
+
+static bool a_sample_inside(const JbModule* m, const JbASample* sample) {
+    return sample->address <= m->size && sample->length <= m->size - sample->address;
+}
+
+static uint32_t a_sample_count(const JbPlayer* player) {
+    const JbModule* m = &player->original;
+    const JbATables* t = &player->a.config.tables;
+    uint32_t limit = m->size;
+    uint32_t n = 0;
+    while (n < UINT8_MAX + 1 && (uint64_t)t->samples + JB_A_SAMPLE_SIZE * (uint64_t)(n + 1) <= limit) {
+        const JbASample sample = jb_a_sample(m, t, (uint8_t)n);
+        if (!a_sample_inside(m, &sample)) {
+            break;
+        }
+        // the silence and the PWM waveform are not sample data that follows the table
+        if (sample.address > t->samples && sample.address < limit && sample.address != t->silence_address
+            && sample.address != t->pwm) {
+            limit = sample.address;
+        }
+        n++;
+    }
+    return n;
+}
+
+static uint32_t b_blocks_end(const JbPlayer* player) {
+    const JbBTables* t = &player->b.config.tables;
+    const uint32_t others[]
+        = { t->master, t->pitch_sequences, t->envelope_start, t->envelope, t->periods, t->sequence_codes, t->songs };
+    uint32_t end = player->original.size;
+    for (size_t i = 0; i < sizeof(others) / sizeof(others[0]); i++) {
+        if (others[i] > t->blocks && others[i] < end) {
+            end = others[i];
+        }
+    }
+    return end;
+}
+
+uint32_t jb_sample_count(const JbPlayer* player) {
+    if (player->version == JbVersion_A) {
+        return a_sample_count(player);
+    }
+    const uint32_t start = player->b.config.tables.blocks;
+    const uint32_t end = b_blocks_end(player);
+    return end > start ? (end - start) >> JB_B_BLOCK_SHIFT : 0;
+}
+
+bool jb_sample_pcm(const JbPlayer* player, uint32_t n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    const JbModule* m = &player->original;
+    if (n >= jb_sample_count(player)) {
+        return false;
+    }
+    if (player->version == JbVersion_B) {
+        // a block is one cycle of a waveform, played over and over
+        *data = (const int8_t*)m->data + player->b.config.tables.blocks + (n << JB_B_BLOCK_SHIFT);
+        *length = 1u << JB_B_BLOCK_SHIFT;
+        *loop_start = 0;
+        *loop_length = *length;
+        return true;
+    }
+    const JbATables* t = &player->a.config.tables;
+    const JbASample sample = jb_a_sample(m, t, (uint8_t)n);
+    // The silent sample, and the PWM waveform, which the driver rewrites every tick, are not sounds of the module.
+    if (sample.length == 0 || sample.address == t->silence_address || sample.address == t->pwm) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + sample.address;
+    *length = sample.length;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a negative loop offset is a one-shot, else the sample repeats from the offset to its end
+    if (sample.loop >= 0 && (uint32_t)sample.loop < sample.length) {
+        *loop_start = (uint32_t)sample.loop;
+        *loop_length = sample.length - (uint32_t)sample.loop;
+    }
+    return true;
+}
+
 JbVoiceState jb_voice_state(const JbPlayer* player, int voice) {
     if (voice < 0 || voice >= JB_VOICES) {
         return (JbVoiceState) { .note = -1, .sample = -1 };

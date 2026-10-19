@@ -102,6 +102,11 @@ AmcTickResult amc_tick(AmcPlayer* player, NuadeVoices* voices);
 // Instruments in the module's table (the notes number them from 1).
 int amc_instrument_count(const AmcPlayer* player);
 
+// The PCM of instrument `inst` (0-based), in bytes. False for an empty instrument. The loop is the part of the
+// sample the instrument repeats; one that lies outside the sample is not given.
+bool amc_instrument_pcm(const AmcPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
+
 AmcVoiceState amc_voice_state(const AmcPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

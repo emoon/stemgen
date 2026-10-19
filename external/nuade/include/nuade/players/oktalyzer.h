@@ -143,6 +143,10 @@ OktVoiceState okt_voice_state(const OktModule* module, int voice);
 int okt_order_pattern(const OktModule* module, int order);
 
 const char* okt_instrument_name(const OktModule* module, int inst);
+// The sample as the file stores it (8-bit, 7-bit significant in the 8-bit modes), the length and the repeat in bytes
+// (length 0: no loop). False for an instrument without sample data.
+bool okt_instrument_pcm(const OktModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
 
 // Edit API
 int okt_get_instrument_count(const OktModule* module);

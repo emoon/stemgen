@@ -73,6 +73,25 @@ static uint32_t kimchristensen_grid_ticks(void* user_data, uint32_t subsong) {
     return kim_grid_ticks((const KimPlayer*)user_data);
 }
 
+static uint32_t kimchristensen_sample_count(void* user_data) {
+    return kim_instrument_count((const KimPlayer*)user_data);
+}
+
+static bool kimchristensen_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!kim_instrument_pcm((const KimPlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_kimchristensen = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "kimchristensen",
@@ -87,6 +106,8 @@ const NuadePlayer nuade_player_kimchristensen = {
     .metadata = kimchristensen_metadata,
     .voice_info = kimchristensen_voice_info,
     .grid_ticks = kimchristensen_grid_ticks,
+    .sample_count = kimchristensen_sample_count,
+    .sample_get = kimchristensen_sample_get,
 };
 
 KimPlayer* kim_from_nuade(NuadeSong* song) {

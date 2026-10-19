@@ -23,6 +23,9 @@ extern const SpRules sp_long_rules;
 void sp_long_start(SpLongState* state, const SpMemory* song, const SpMemory* set, SpHardware* hardware, int subsong);
 void sp_long_tick(SpLongState* state, SpHardware* hardware);
 
+// The waveform of instrument `index` of the sample set (SP_INSTRUMENTS entries); false for an entry outside the set.
+bool sp_long_instrument_wave(const SpMemory* set, unsigned index, SpWave* wave);
+
 // Every voice has died away.
 bool sp_long_silent(const SpLongState* state);
 

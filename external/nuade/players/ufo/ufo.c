@@ -117,3 +117,23 @@ UfoVoiceState ufo_voice_state(const UfoPlayer* player, int voice) {
     const UfoVoice* v = &player->state.voices[voice];
     return (UfoVoiceState) { .note = v->display_note, .instrument = v->display_instrument };
 }
+
+bool ufo_instrument_pcm(const UfoPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    if (index < 0 || index >= UFO_INSTRUMENTS) {
+        return false;
+    }
+    const UfoInstrument* inst = &player->song.instruments[index];
+    if (inst->start == nullptr || inst->end <= inst->start) {
+        return false;
+    }
+    *data = inst->start;
+    *length = (uint32_t)(inst->end - inst->start);
+    *loop_start = 0;
+    *loop_length = 0;
+    if (inst->loops) {
+        *loop_start = (uint32_t)(inst->loop_start - inst->start);
+        *loop_length = (uint32_t)(inst->end - inst->loop_start);
+    }
+    return true;
+}

@@ -156,6 +156,14 @@ int tronic_order_count(const TronicPlayer* player);
 
 TronicVoiceState tronic_voice_state(const TronicPlayer* player, int voice);
 
+int tronic_instrument_count(const TronicPlayer* player);
+// The PCM of instrument `index` (0-based, as TronicVoiceState.instrument), bytes as the replayer hands them to Paula
+// (the first word of a sample is cleared once the sample has been played). A sample instrument gives its sample; a
+// waveform list instrument gives the waveform its first step starts on, looped. Lengths and loop in bytes. False for
+// an empty instrument or data outside the file.
+bool tronic_instrument_pcm(const TronicPlayer* player, int index, const int8_t** data, uint32_t* length,
+                           uint32_t* loop_start, uint32_t* loop_length);
+
 // `order` 0 .. tronic_order_count - 1, `voice` 0..3, `row` 0..15.
 TronicCell tronic_pattern_cell(const TronicPlayer* player, int order, int voice, int row);
 

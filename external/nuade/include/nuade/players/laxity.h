@@ -173,6 +173,11 @@ const char* lx_title(const LxPlayer* player);
 const char* lx_instrument_name(const LxPlayer* player, int instrument);
 int lx_instrument_count(const LxPlayer* player);
 
+// The sample of instrument `instrument` (1-based) in bytes, with its loop (loop_length 0: none). False for a synth
+// instrument, an empty one, or one whose sample is not inside the module.
+bool lx_instrument_pcm(const LxPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
+
 // The row decoded by the last row tick (position 0, row 0 before the first one).
 LxPosition lx_position(const LxPlayer* player);
 int lx_order_count(const LxPlayer* player);

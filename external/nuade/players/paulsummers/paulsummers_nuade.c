@@ -64,6 +64,23 @@ static uint32_t paulsummers_voice_info(void* user_data, NuadeVoiceInfo* out, uin
     return n;
 }
 
+static uint32_t paulsummers_sample_count(void* user_data) {
+    return ps_instrument_count((const PsPlayer*)user_data);
+}
+
+static bool paulsummers_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const PsPlayer* player = (const PsPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length;
+    if (!ps_instrument_pcm(player, n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = 0, .loop_frames = 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_paulsummers = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "paulsummers",
@@ -77,6 +94,8 @@ const NuadePlayer nuade_player_paulsummers = {
     .tick = paulsummers_tick,
     .metadata = paulsummers_metadata,
     .voice_info = paulsummers_voice_info,
+    .sample_count = paulsummers_sample_count,
+    .sample_get = paulsummers_sample_get,
 };
 
 PsPlayer* ps_from_nuade(NuadeSong* song) {

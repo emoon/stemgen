@@ -683,6 +683,31 @@ void hip_destroy(HipPlayer* player) {
     }
 }
 
+uint32_t hip_sample_count(const HipPlayer* player) {
+    const HipModule* m = &player->module;
+    return m->sample_data > m->samples ? (m->sample_data - m->samples) / SAMPLE_SIZE : 0;
+}
+
+bool hip_sample_pcm(const HipPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                    uint32_t* loop_frames) {
+    const HipModule* m = &player->module;
+    if (n >= hip_sample_count(player)) {
+        return false;
+    }
+    const SampleEntry e = sample_entry(m, (uint8_t)n);
+    const uint64_t length = (uint64_t)e.length * 2;
+    if (n > UINT8_MAX || length == 0 || (uint64_t)m->sample_data + e.offset + length > m->size) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + m->sample_data + e.offset;
+    *frames = (uint32_t)length;
+    // a repeat of one word (or none) is the "no loop" the replayer writes
+    const bool loops = e.loop_length > 1 && (uint64_t)e.loop_start + (uint64_t)e.loop_length * 2 <= length;
+    *loop_start = loops ? e.loop_start : 0;
+    *loop_frames = loops ? (uint32_t)e.loop_length * 2 : 0;
+    return true;
+}
+
 int hip_subsong_count(const HipPlayer* player) {
     return player->module.subsong_count;
 }

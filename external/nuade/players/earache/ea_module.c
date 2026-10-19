@@ -190,6 +190,19 @@ EaInstrument ea_instrument(const EaModule* module, uint32_t index) {
                             .fine_tune = (int8_t)field[10] };
 }
 
+uint32_t ea_instrument_count(const EaModule* module) {
+    // the instruments run up to the table that follows them, whichever of the other three that is
+    const EaHeader* h = &module->header;
+    const uint32_t next[] = { h->samples, h->volumes, h->pitches };
+    uint32_t end = 0;
+    for (size_t i = 0; i < nuade_sizeof_array(next); i++) {
+        if (next[i] > h->instruments && (end == 0 || next[i] < end)) {
+            end = next[i];
+        }
+    }
+    return end != 0 ? (end - h->instruments) / EA_INSTRUMENT_BYTES : 0;
+}
+
 // A sample table entry: AUDxLC and AUDxLEN as the replayer writes them.
 
 EaSample ea_sample(const EaModule* module, uint32_t index) {

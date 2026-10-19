@@ -962,6 +962,22 @@ const char* okt_instrument_name(const OktModule* module, int inst) {
     return module->samples[inst].name;
 }
 
+bool okt_instrument_pcm(const OktModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= (int)module->samp_num)
+        return false;
+    const OktSample* s = &module->samples[inst];
+    if (s->sample_data == nullptr || s->length == 0)
+        return false;
+    *data = s->sample_data;
+    *length = s->length;
+    // a repeat of one word holds the last word of the sample: no loop
+    const bool loops = s->repeat_length > 2;
+    *loop_start = loops ? s->repeat_start : 0;
+    *loop_length = loops ? s->repeat_length : 0;
+    return true;
+}
+
 // Edit API
 
 int okt_get_instrument_count(const OktModule* module) {

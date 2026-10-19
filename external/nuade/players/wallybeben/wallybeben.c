@@ -93,3 +93,45 @@ WbVoiceState wb_voice_state(const WbPlayer* player, uint32_t voice) {
     return (WbVoiceState) { .period = player->replay.last_period[voice],
                             .instrument = player->replay.last_instrument[voice] };
 }
+
+uint32_t wb_instrument_count(const WbPlayer* player) {
+    // an instrument is named by a byte offset into the table
+    const uint32_t reachable = (UINT8_MAX + 1) / WB_INSTRUMENT_BYTES;
+    return player->module.instrument_count < reachable ? player->module.instrument_count : reachable;
+}
+
+bool wb_instrument_pcm(const WbPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    const WbModule* m = &player->module;
+    WbInstrument ins;
+    if (index >= wb_instrument_count(player) || !wb_module_instrument(m, (uint8_t)(index * WB_INSTRUMENT_BYTES), &ins)
+        || ins.sample >= m->sample_count) {
+        return false;
+    }
+    const uint32_t start = m->sample_ptr[ins.sample];
+    // the first block the note plays, then the repeat; the builds with a silent repeat have none for flags 0
+    const bool first_uses_loop = ins.flags != 0 && !m->version->quirks.first_block_ignores_flags;
+    uint32_t bytes = first_uses_loop ? (uint32_t)ins.loop_offset + ins.loop_length : ins.length;
+    const bool silent_repeat = m->version->quirks.loop_mode == WbLoop_FlagSilence && ins.flags == 0;
+    // a repeat of a word or less is the "no loop" of the Amiga
+    const bool loops = !silent_repeat && ins.loop_length > 2;
+    const uint32_t loop_end = (uint32_t)ins.loop_offset + ins.loop_length;
+    if (loops && loop_end > bytes) {
+        bytes = loop_end;
+    }
+    if (start == WB_BAD_POINTER || start >= m->size || bytes == 0) {
+        return false;
+    }
+    if (bytes > m->size - start) {
+        bytes = m->size - start;
+    }
+    *data = (const int8_t*)(m->image + start);
+    *length = bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (loops && loop_end <= bytes) {
+        *loop_start = ins.loop_offset;
+        *loop_length = ins.loop_length;
+    }
+    return true;
+}

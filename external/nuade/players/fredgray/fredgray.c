@@ -567,3 +567,54 @@ FgVoiceState fg_voice_state(const FgPlayer* p, int voice) {
     const uint16_t period = voice >= 0 && voice < FG_ACTIVE_VOICES ? p->voices[voice].note_period : 0;
     return (FgVoiceState) { .note = period != 0 ? nuade_period_to_note(period) : -1 };
 }
+
+// The sounds: the waves a command's flags can pick (wave_select), the kick sample (has_kick) and, when it lies outside
+// the wave table, the noise wave (has_noise).
+
+static bool noise_outside_wave_table(const FgLayout* l) {
+    return l->features.has_noise
+           && !(l->features.wave_select && l->noise_wave >= l->wave_base
+                && l->noise_wave < l->wave_base + FG_WAVE_TABLE_BYTES);
+}
+
+uint32_t fg_sound_count(const FgPlayer* player) {
+    const FgLayout* l = &player->layout;
+    return (l->features.wave_select ? FG_WAVE_TABLE_BYTES / FG_WAVE_BYTES : 0) + (l->features.has_kick ? 1 : 0)
+           + (noise_outside_wave_table(l) ? 1 : 0);
+}
+
+bool fg_sound_pcm(const FgPlayer* player, uint32_t n, uint32_t* number, const int8_t** data, uint32_t* bytes,
+                  bool* loops) {
+    const FgLayout* l = &player->layout;
+    const uint32_t waves = l->features.wave_select ? FG_WAVE_TABLE_BYTES / FG_WAVE_BYTES : 0;
+    uint32_t offset;
+    uint32_t length = FG_WAVE_BYTES;
+    *loops = true; // a wave is what the voice's channel repeats
+    if (n < waves) {
+        offset = l->wave_base + n * FG_WAVE_BYTES;
+    } else if (n == waves && l->features.has_kick) {
+        offset = l->kick_sample;
+        length = FG_SAMPLE_BYTES;
+        *loops = false; // a hit: the song switches the channel back to the silent wave
+    } else if (n < fg_sound_count(player)) {
+        offset = l->noise_wave;
+    } else {
+        return false;
+    }
+    *number = offset;
+    // the image as loaded: the noise and the voices' waves change in the working copy
+    const int8_t* pcm = (const int8_t*)player->original.image + offset;
+    if (l->features.has_noise && offset == l->noise_wave) {
+        return false; // made up again every tick
+    }
+    bool silent = true;
+    for (uint32_t i = 0; i < length && silent; i++) {
+        silent = pcm[i] == 0;
+    }
+    if (silent) {
+        return false;
+    }
+    *data = pcm;
+    *bytes = length;
+    return true;
+}

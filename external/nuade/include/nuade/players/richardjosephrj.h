@@ -176,6 +176,20 @@ RjgTickResult rjg_tick(RjgPlayer* player, NuadeVoices* voices);
 
 RjgVoiceState rjg_voice_state(const RjgPlayer* player, int voice);
 
+// The instrument rows of the module (the numbers the sequences select; the table has no stored count, so it is the run
+// of valid rows from row 0).
+#define RJG_MAX_INSTRUMENTS 256
+int rjg_instrument_count(const RjgPlayer* player);
+
+// The sound of instrument row `n`. False for a row that plays nothing but zeros (the dummy word, or a silent tail).
+typedef struct RjgInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = plays once
+} RjgInstrumentPcm;
+bool rjg_instrument_pcm(const RjgPlayer* player, int n, RjgInstrumentPcm* out);
+
 // Ticks of one duration unit in a subsong (0-based): the first tempo the sequences set, 1 if they set none; 0 for a
 // bad subsong.
 uint32_t rjg_grid_ticks(const RjgPlayer* player, int subsong);

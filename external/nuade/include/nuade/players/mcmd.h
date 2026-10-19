@@ -138,6 +138,12 @@ int mcmd_speed(const McmdPlayer* player);
 
 McmdVoiceState mcmd_voice_state(const McmdPlayer* player, int voice);
 
+// The sample table. A sample is 8-bit PCM; false for one that is empty or lies outside the module.
+// `loop_length` 0 means no repeat.
+int mcmd_sample_count(const McmdPlayer* player);
+bool mcmd_sample_pcm(const McmdPlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                     uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 McmdPlayer* mcmd_from_nuade(NuadeSong* song);
 

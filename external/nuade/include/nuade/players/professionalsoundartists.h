@@ -26,6 +26,7 @@ extern "C" {
 #define PSA_TICK_LENGTH 14187
 
 #define PSA_TITLE_BYTES 32
+#define PSA_NAME_BYTES 32 // an instrument name
 
 typedef struct PsaPlayer PsaPlayer;
 
@@ -117,6 +118,8 @@ struct PsaPlayer {
     size_t size;   // the module's size
     PsaLayout layout;
     char title[PSA_TITLE_BYTES + 1];
+    uint32_t instrument_count;
+    char (*instrument_names)[PSA_NAME_BYTES + 1];
     bool fault; // the replayer left what the port models (dry run only)
     bool looped;
     bool playing;
@@ -148,6 +151,20 @@ bool psa_start(PsaPlayer* player, uint32_t subsong, NuadeVoices* voices);
 
 // Run one player tick and hand the Paula registers it wrote to the voices.
 PsaTickResult psa_tick(PsaPlayer* player, NuadeVoices* voices);
+
+// Instruments the module holds (the numbers the notes use are 0-based indexes into them).
+uint32_t psa_instrument_count(const PsaPlayer* player);
+
+// The PCM of a sample instrument. False for a pulse-width synth instrument (its wave is built while playing) or an
+// empty one. The loop is in frames, loop_frames 0 = the sample plays once.
+typedef struct PsaInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;
+    uint32_t loop_frames;
+    const char* name; // "" if none
+} PsaInstrumentPcm;
+bool psa_instrument_pcm(const PsaPlayer* player, uint32_t n, PsaInstrumentPcm* out);
 
 // Ticks per row the song is at.
 uint32_t psa_grid_ticks(const PsaPlayer* player);

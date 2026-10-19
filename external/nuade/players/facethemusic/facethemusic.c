@@ -1410,6 +1410,20 @@ int ftm_get_instrument_count(const FtmModule* module) {
     return module ? (int)module->num_samples : 0;
 }
 
+bool ftm_sample_pcm(const FtmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= (int)module->num_samples)
+        return false;
+    const FtmSample* s = &module->samples[inst];
+    if (!s->sample_data || s->sample_data == ftm_quiet_sample.sample_data || s->total_length == 0)
+        return false;
+    *data = s->sample_data;
+    *length = s->total_length;
+    *loop_start = s->loop_length != 0 ? s->loop_start : 0;
+    *loop_length = (uint32_t)s->loop_length * 2U;
+    return true;
+}
+
 int ftm_get_num_measures(const FtmModule* module) {
     return module ? (int)module->num_measures : 0;
 }

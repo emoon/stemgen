@@ -68,6 +68,22 @@ static uint32_t dynamicsynthesizer_grid_ticks(void* user_data, uint32_t subsong)
     return dns_grid_ticks((const DnsPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t dynamicsynthesizer_sample_count(void* user_data) {
+    return dns_sample_count((const DnsPlayer*)user_data);
+}
+
+static bool dynamicsynthesizer_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dns_sample_pcm((const DnsPlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_dynamicsynthesizer = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "dynamicsynthesizer",
@@ -82,6 +98,8 @@ const NuadePlayer nuade_player_dynamicsynthesizer = {
     .metadata = dynamicsynthesizer_metadata,
     .voice_info = dynamicsynthesizer_voice_info,
     .grid_ticks = dynamicsynthesizer_grid_ticks,
+    .sample_count = dynamicsynthesizer_sample_count,
+    .sample_get = dynamicsynthesizer_sample_get,
 };
 
 DnsPlayer* dns_from_nuade(NuadeSong* song) {

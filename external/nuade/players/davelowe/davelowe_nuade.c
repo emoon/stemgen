@@ -68,6 +68,26 @@ static uint32_t davelowe_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t davelowe_sample_count(void* user_data) {
+    return dl_sample_count((DlPlayer*)user_data);
+}
+
+static bool davelowe_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    int instrument;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dl_sample_pcm((DlPlayer*)user_data, n, &instrument, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = (uint32_t)instrument,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_davelowe = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "davelowe",
@@ -82,6 +102,8 @@ const NuadePlayer nuade_player_davelowe = {
     .metadata = davelowe_metadata,
     .voice_info = davelowe_voice_info,
     .grid_ticks = davelowe_grid_ticks,
+    .sample_count = davelowe_sample_count,
+    .sample_get = davelowe_sample_get,
 };
 
 DlPlayer* dl_from_nuade(NuadeSong* song) {

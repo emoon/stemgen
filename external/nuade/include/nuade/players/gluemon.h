@@ -121,6 +121,13 @@ GmCell gm_cell(const GmPlayer* player, uint32_t order, uint32_t voice, uint32_t 
 // The period table index of the last note a voice started, -1 if none.
 int gm_voice_note(const GmPlayer* player, uint32_t voice);
 
+// The sounds a voice can play (the instrument numbers of the voices): the four waveforms of the module, then, for a
+// module with percussion, the ramp, the noise and the first bytes of a pattern. The PCM of sound `n` is a 32 byte
+// single cycle, signed 8 bit, that the voice repeats. False for the noise (made up at every use) and the pattern bytes
+// (they differ with the pattern).
+uint32_t gm_sound_count(const GmPlayer* player);
+bool gm_sound_pcm(const GmPlayer* player, uint32_t n, const int8_t** data, uint32_t* bytes);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 GmPlayer* gm_from_nuade(NuadeSong* song);
 

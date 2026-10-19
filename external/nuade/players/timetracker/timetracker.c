@@ -1025,3 +1025,31 @@ TtCell tt_pattern_cell(const TtPlayer* player, int order, int voice, int row) {
     }
     return (TtCell) { .note = cell.note, .sample = cell.sample, .cmd = cell.cmd, .param = cell.param };
 }
+
+bool tt_sample_pcm(const TtPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    const TtModule* m = &player->module;
+    if (index < 0 || index >= m->sample_count) {
+        return false;
+    }
+    const SampleHeader h = sample_header(m, m->sample_table, (uint32_t)index);
+    if (h.length == 0) {
+        return false;
+    }
+    *data = (const int8_t*)m->samples + m->sample_offset[index];
+    *length = (uint32_t)h.length * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a loop start of 0 is the "no loop" the player plays
+    if (h.loop_start != 0 && h.loop_length > 1) {
+        const uint32_t start = (uint32_t)h.loop_start * 2;
+        if (start < *length) {
+            *loop_start = start;
+            *loop_length = (uint32_t)h.loop_length * 2;
+            if (*loop_length > *length - start) {
+                *loop_length = *length - start;
+            }
+        }
+    }
+    return true;
+}

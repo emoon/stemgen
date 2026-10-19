@@ -109,6 +109,37 @@ uint32_t jp_grid_ticks(const JpPlayer* player, int subsong) {
     return jp_table_value(player, player->layout.speed_table, index) + 1u;
 }
 
+uint32_t jp_sample_count(const JpPlayer* player) {
+    return player->layout.sample_count;
+}
+
+bool jp_sample_pcm(const JpPlayer* player, uint32_t n, const int8_t** data, uint32_t* length) {
+    const JpLayout* layout = &player->layout;
+    if (n >= layout->sample_count) {
+        return false;
+    }
+    const uint32_t start = layout->sample_start[n];
+    uint32_t end;
+    if (player->format == JpFormat_Realms) {
+        // The table holds start offsets: a sample ends where the next one in memory starts, the last at the image end.
+        end = player->mem.size;
+        for (uint32_t i = 0; i < layout->sample_count; i++) {
+            if (layout->sample_start[i] > start && layout->sample_start[i] < end) {
+                end = layout->sample_start[i];
+            }
+        }
+    } else {
+        end = start + jp_u32(&player->mem, layout->sample_table + n * 4);
+    }
+    // the image as loaded: the instrument scripts rewrite samples while playing
+    if (start >= player->mem.size || end <= start || end > player->mem.size) {
+        return false;
+    }
+    *data = (const int8_t*)player->pristine + start;
+    *length = end - start;
+    return true;
+}
+
 JpVoiceState jp_voice_state(const JpPlayer* player, int voice) {
     if (player == nullptr || voice < 0 || voice >= JP_VOICES) {
         return (JpVoiceState) { .note = -1, .instrument = -1 };

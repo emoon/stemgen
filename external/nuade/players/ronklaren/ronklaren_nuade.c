@@ -67,6 +67,21 @@ static uint32_t ronklaren_grid_ticks(void* user_data, uint32_t subsong) {
     return RK_TICKS_PER_ROW;
 }
 
+static uint32_t ronklaren_sample_count(void* user_data) {
+    return (uint32_t)rk_get_instrument_count((const RkModule*)user_data);
+}
+
+static bool ronklaren_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    RkInstrumentPcm pcm;
+    if (!rk_instrument_pcm((const RkModule*)user_data, (int)n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = pcm.data, .frames = pcm.frames, .bits = 8, .loop_frames = pcm.loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_ronklaren = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "ronklaren",
@@ -81,6 +96,8 @@ const NuadePlayer nuade_player_ronklaren = {
     .metadata = ronklaren_metadata,
     .voice_info = ronklaren_voice_info,
     .grid_ticks = ronklaren_grid_ticks,
+    .sample_count = ronklaren_sample_count,
+    .sample_get = ronklaren_sample_get,
 };
 
 RkModule* rk_from_nuade(NuadeSong* song) {

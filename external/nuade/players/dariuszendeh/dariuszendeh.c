@@ -39,6 +39,10 @@ typedef struct Instrument {
     uint16_t length_words;
 } Instrument;
 
+// Bounds of the scan of the patterns, which a damaged list could run on through the module.
+#define MAX_SCAN_ROWS 1024
+#define MAX_SCAN_STEPS 4096
+
 static StepEntry read_step_entry(const DzModule* m, uint32_t offset) {
     return (StepEntry) { .pattern = dzm_u8(m, offset), .transpose = dzm_u8(m, offset + 1) };
 }
@@ -258,4 +262,60 @@ DzTickResult dz_tick(DzPlayer* player, NuadeVoices* voices) {
 DzVoiceState dz_voice_state(const DzPlayer* player, int voice) {
     const DzVoice* v = &player->voices[voice];
     return (DzVoiceState) { .note = v->note, .instrument = v->instrument };
+}
+
+// The highest instrument a row of a pattern that a list step names plays, + 1. A song's patterns have the row count
+// of its first pattern.
+static int song_instrument_count(const DzModule* m, const DzLayout* layout, const DzSong* song) {
+    uint32_t rows = 0;
+    while (rows < MAX_SCAN_ROWS && read_row(m, layout, song->pattern_base + rows * ROW_BYTES).instrument != END_MARK) {
+        rows++;
+    }
+    int count = 0;
+    // a two voice song starts from its start list and continues with the loop list; a four voice song has the latter
+    const uint32_t lists[2] = { song->voices == 2 ? song->start_list : song->loop_list, song->loop_list };
+    for (int l = 0; l < 2; l++) {
+        uint32_t pos = lists[l];
+        for (uint32_t step = 0; step < MAX_SCAN_STEPS; step++, pos += (uint32_t)song->voices * STEP_BYTES) {
+            if (read_step_entry(m, pos).pattern == END_MARK) {
+                break;
+            }
+            for (int v = 0; v < song->voices; v++) {
+                const uint32_t pattern
+                    = song->pattern_base
+                      + (uint32_t)read_step_entry(m, pos + (uint32_t)v * STEP_BYTES).pattern * song->record_size;
+                for (uint32_t row = 0; row < rows; row++) {
+                    const int instrument = read_row(m, layout, pattern + row * ROW_BYTES).instrument;
+                    count = instrument + 1 > count ? instrument + 1 : count;
+                }
+            }
+        }
+    }
+    return count;
+}
+
+int dz_instrument_count(const DzPlayer* player) {
+    int count = 0;
+    for (int i = 0; i < player->layout.song_count; i++) {
+        const int song_count = song_instrument_count(&player->module, &player->layout, &player->layout.songs[i]);
+        count = song_count > count ? song_count : count;
+    }
+    return count;
+}
+
+bool dz_instrument_pcm(const DzPlayer* player, int inst, const int8_t** data, uint32_t* length) {
+    if (inst < 0 || inst >= END_MARK) {
+        return false;
+    }
+    const Instrument ins = read_instrument(&player->module, &player->layout, (uint8_t)inst);
+    const uint32_t start = player->layout.sample_base + ins.sample_offset;
+    uint32_t size = (uint32_t)ins.length_words * 2;
+    if (size == 0 || start >= player->module.size) {
+        return false;
+    }
+    // a sample that runs past the module plays zeros there: only its bytes in the module are exported
+    size = size < player->module.size - start ? size : player->module.size - start;
+    *data = dzm_sample(&player->module, start);
+    *length = size;
+    return true;
 }

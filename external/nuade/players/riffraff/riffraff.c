@@ -438,6 +438,42 @@ const char* rr_title(const RrPlayer* player) {
     return player->title;
 }
 
+uint32_t rr_instrument_count(const RrPlayer* player) {
+    // the length table follows the pointer table (4 bytes against 2 per instrument)
+    const RrModule* m = &player->module;
+    const uint32_t ptrs = m->base[RrRole_SamplePtrs];
+    const uint32_t lens = m->base[RrRole_SampleLens];
+    const uint32_t count = lens > ptrs ? (lens - ptrs) / 4 : 0;
+    return count < RR_MAX_SAMPLE_INSTRUMENTS ? count : RR_MAX_SAMPLE_INSTRUMENTS;
+}
+
+bool rr_instrument_pcm(const RrPlayer* player, uint32_t n, RrInstrumentPcm* out) {
+    const RrModule* m = &player->module;
+    RrSample attack = { 0 };
+    if (n >= rr_instrument_count(player) || !rr_module_sample(m, n, &attack) || attack.start == m->size) {
+        return false; // no such instrument, or one that plays the replayer's zero bytes
+    }
+    const uint32_t attack_frames = attack.words != 0 ? attack.words * 2u : NUADE_PAULA_MAX_SAMPLE_BYTES;
+    if (attack.words == 1) {
+        return false; // a single word is the silence
+    }
+    *out = (RrInstrumentPcm) { .data = rr_chip(player, attack.start), .frames = attack_frames };
+    // The loop that follows the attack. When it lies inside the attack or right behind it the two are one sound; any
+    // other loop is a sound of its own that this instrument cannot show.
+    RrSample loop = { 0 };
+    if (m->version->driver != RrDriver_OneShot && rr_module_loop(m, n, &loop) && loop.start != m->size && loop.words > 1
+        && loop.start >= attack.start && loop.start - attack.start <= attack_frames) {
+        const uint32_t start = loop.start - attack.start;
+        const uint32_t loop_frames = loop.words * 2u;
+        if (start + loop_frames > out->frames) {
+            out->frames = start + loop_frames;
+        }
+        out->loop_start = start;
+        out->loop_frames = loop_frames;
+    }
+    return true;
+}
+
 RrVoiceState rr_voice_state(const RrPlayer* player, uint32_t voice) {
     const RrVoice* state = &player->voices[voice];
     return (RrVoiceState) { .period = state->period, .instrument = state->instrument };

@@ -17,6 +17,7 @@ extern "C" {
 #define DM1_TICK_HZ 50
 
 #define DM1_BLOCK_LINES 16
+#define DM1_INSTRUMENTS 20
 // The lowest note (period 6848) sits this many octaves below C-0.
 #define DM1_NOTE_OCTAVE_SHIFT (-2)
 
@@ -200,6 +201,12 @@ Dm1VoiceState dm1_voice_state(const Dm1Module* module, int voice);
 // The line `row` of the block at position `order` of the track of `voice`; empty for a position outside the track or a
 // jump entry.
 Dm1Cell dm1_cell(const Dm1Module* module, int order, int voice, int row);
+
+// The sound of instrument 0..19 (an empty slot has none). A sample instrument is its sample and loop. A synth
+// instrument plays waves of `sample_length` bytes that its sound table picks from the sound data in steps of 32 bytes:
+// the wave the table starts with is returned, as the loop that Paula repeats.
+bool dm1_instrument_pcm(const Dm1Module* module, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 Dm1Module* dm1_from_nuade(NuadeSong* song);

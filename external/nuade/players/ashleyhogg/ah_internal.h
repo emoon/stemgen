@@ -107,6 +107,7 @@ bool ah_old_locate(AhOld* old, const AhMemory* module);
 bool ah_new_locate(AhNew* modern, const AhMemory* module);
 
 // How far the AUDxLC of a sample can reach (and the bytes the driver reads around them): the module is padded to it.
+uint32_t ah_old_instrument_count(const AhOld* old);
 uint64_t ah_old_samples_end(const AhOld* old, const AhMemory* module);
 uint64_t ah_new_samples_end(const AhMemory* samples);
 

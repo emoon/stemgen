@@ -102,6 +102,23 @@ static uint32_t sidmon2_tracker_cells(void* user_data, const NuadePosition* at, 
     return nuade_tracker_fill(at, SD2_VOICES, rows, channel, row_lo, row_hi, out, cap, sidmon2_cell, user_data);
 }
 
+static uint32_t sidmon2_sample_count(void* user_data) {
+    return (uint32_t)sd2_get_instrument_count((const Sd2Module*)user_data);
+}
+
+// The sounds are the instruments (voice_info counts them from 1): each is the sample its note starts.
+static bool sidmon2_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sd2_instrument_pcm((const Sd2Module*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n + 1, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_sidmon2 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "sidmon2",
@@ -118,6 +135,8 @@ const NuadePlayer nuade_player_sidmon2 = {
     .voice_info = sidmon2_voice_info,
     .tracker_info = sidmon2_tracker_info,
     .tracker_cells = sidmon2_tracker_cells,
+    .sample_count = sidmon2_sample_count,
+    .sample_get = sidmon2_sample_get,
 };
 
 Sd2Module* sd2_from_nuade(NuadeSong* song) {

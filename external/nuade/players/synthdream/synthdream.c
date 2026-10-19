@@ -647,6 +647,50 @@ int sdr_subsong_count(const SdrPlayer* p) {
     return p->subsong_count;
 }
 
+uint32_t sdr_instrument_count(const SdrPlayer* p) {
+    // The instrument records run to the end of the module; a note names one with a byte.
+    const uint32_t first = p->header.instruments;
+    if (first >= p->memory.module_size) {
+        return 0;
+    }
+    const uint32_t count = (p->memory.module_size - first) / SDR_INSTRUMENT_BYTES;
+    return count > 256 ? 256 : count;
+}
+
+bool sdr_instrument_pcm(const SdrPlayer* p, uint32_t inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                        uint32_t* loop_frames) {
+    if (inst >= sdr_instrument_count(p) || p->memory.samples_unknown) {
+        return false;
+    }
+    SdrMemory memory = p->memory; // the read may set `stray`: that must not reach the player's memory
+    const SdrInstrument instrument = sdr_read_instrument(&memory, p->header.instruments, (uint16_t)inst);
+    // A synthesised waveform is built from the presets at run time; a muted record plays nothing.
+    if (instrument.muted || instrument.waveform != 0) {
+        return false;
+    }
+    const SdrSampleRef* sample = &instrument.sample;
+    const uint64_t start = sample->start;
+    uint64_t end = start + (uint64_t)sample->length_words * 2;
+    uint64_t loop_at = 0;
+    uint64_t loop_length = 0;
+    // The sample plays its first part once and then repeats the loop part, which normally follows it.
+    if (sample->loop_length_words > 1 && sample->loop_start >= start) {
+        loop_at = sample->loop_start - start;
+        loop_length = (uint64_t)sample->loop_length_words * 2;
+        if (sample->loop_start + loop_length > end) {
+            end = sample->loop_start + loop_length;
+        }
+    }
+    if (end == start || end > memory.sample_size) {
+        return false;
+    }
+    *data = (const int8_t*)memory.samples + start;
+    *frames = (uint32_t)(end - start);
+    *loop_start = (uint32_t)loop_at;
+    *loop_frames = (uint32_t)loop_length;
+    return true;
+}
+
 SdrVoiceState sdr_voice_state(const SdrPlayer* p, int voice) {
     if (voice < 0 || voice >= SDR_VOICES) {
         return (SdrVoiceState) { .note = -1, .instrument = -1 };

@@ -71,6 +71,22 @@ static void fred_np_metadata(void* user_data, const NuadeMetadataSink* sink) {
     sink->set_tag(sink->ctx, NUADE_META_FORMAT, "Fred Editor");
 }
 
+static uint32_t fred_np_sample_count(void* user_data) {
+    return (uint32_t)fred_get_instrument_count((const FredModule*)user_data);
+}
+
+static bool fred_np_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!fred_instrument_pcm((const FredModule*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_fred_np = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "fred_np",
@@ -85,6 +101,8 @@ const NuadePlayer nuade_player_fred_np = {
     .metadata = fred_np_metadata,
     .voice_info = fred_np_voice_info,
     .grid_ticks = fred_np_grid_ticks,
+    .sample_count = fred_np_sample_count,
+    .sample_get = fred_np_sample_get,
 };
 
 FredModule* fred_from_nuade(NuadeSong* song) {

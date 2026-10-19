@@ -126,6 +126,14 @@ bool ao_start(AoPlayer* player, int subsong, NuadeVoices* voices);
 AoTickResult ao_tick(AoPlayer* player, NuadeVoices* voices);
 
 // Ticks one sequencer step spans (the subsong's speed byte); 0 for a bad subsong.
+// The instruments of the module (the voice state numbers them), and the PCM of the sample an instrument starts, in
+// bytes. A sample is an attack part played once and a loop part repeated after it; they are given as one run when the
+// loop part starts inside the attack part and reaches its end. False for an instrument without sample data, or whose
+// parts do not form one run.
+int ao_sample_count(const AoPlayer* player);
+bool ao_sample_pcm(const AoPlayer* player, int sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 uint32_t ao_grid_ticks(const AoPlayer* player, int subsong);
 AoVoiceState ao_voice_state(const AoPlayer* player, int voice);
 

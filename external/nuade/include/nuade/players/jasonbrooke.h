@@ -257,6 +257,12 @@ JbTickResult jb_tick(JbPlayer* player, NuadeVoices* voices);
 // (256 / tempo ticks), version B steps when a counter that starts at its tempo runs out.
 int jb_ticks_per_step(const JbPlayer* player);
 
+// The sample table of version A (the number the voices report), or the block bank of version B, and the PCM of one.
+// False for an entry without data of the module: the silent sample, and the PWM waveform the driver rewrites.
+uint32_t jb_sample_count(const JbPlayer* player);
+bool jb_sample_pcm(const JbPlayer* player, uint32_t n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 JbVoiceState jb_voice_state(const JbPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

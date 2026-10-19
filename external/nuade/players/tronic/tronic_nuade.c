@@ -109,6 +109,22 @@ static uint32_t tronic_nuade_tracker_cells(void* user_data, const NuadePosition*
                               user_data);
 }
 
+static uint32_t tronic_nuade_sample_count(void* user_data) {
+    return (uint32_t)tronic_instrument_count((const TronicPlayer*)user_data);
+}
+
+static bool tronic_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!tronic_instrument_pcm((const TronicPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_tronic = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "tronic",
@@ -125,6 +141,8 @@ const NuadePlayer nuade_player_tronic = {
     .voice_info = tronic_nuade_voice_info,
     .tracker_cells = tronic_nuade_tracker_cells,
     .tracker_info = tronic_nuade_tracker_info,
+    .sample_count = tronic_nuade_sample_count,
+    .sample_get = tronic_nuade_sample_get,
 };
 
 TronicPlayer* tronic_from_nuade(NuadeSong* song) {

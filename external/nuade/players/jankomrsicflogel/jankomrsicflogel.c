@@ -219,6 +219,23 @@ uint32_t jmf_grid_ticks(const JmfPlayer* player) {
     return player->module.driver->tick_divisor;
 }
 
+bool jmf_waveform_pcm(const JmfPlayer* player, uint32_t waveform, const int8_t** data, uint32_t* frames) {
+    const JmfModule* m = &player->module;
+    if (waveform != 1 && waveform != 2) {
+        return false;
+    }
+    // The second waveform plays with its own length where the version has one, else with the length of the first.
+    const uint32_t words
+        = waveform == 2 && m->driver->wave_b_words != 0 ? m->driver->wave_b_words : m->driver->wave_a_words;
+    const uint32_t offset = waveform == 1 ? m->wave_a : m->wave_b;
+    if ((uint64_t)offset + (uint64_t)words * 2 > m->size) {
+        return false;
+    }
+    *data = (const int8_t*)player->chip + offset;
+    *frames = words * 2;
+    return true;
+}
+
 uint16_t jmf_voice_period(const JmfPlayer* player, uint32_t voice) {
     return player->voices[voice].paula.period;
 }

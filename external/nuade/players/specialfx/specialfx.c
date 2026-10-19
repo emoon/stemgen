@@ -1369,6 +1369,48 @@ JdTickResult jd_tick(JdPlayer* player, NuadeVoices* voices) {
     return (JdTickResult) { .looped = player->looped, .ended = !any };
 }
 
+int jd_instrument_count(const JdPlayer* player) {
+    const JdTables* t = &player->tables;
+    const uint32_t end = t->instruments + INSTRUMENT_RECORD_SIZE * (uint32_t)player->instrument_count;
+    if (t->instrument_select > end) {
+        return 0;
+    }
+    const uint32_t count = (end - t->instrument_select) / INSTRUMENT_RECORD_SIZE;
+    return count > 256 ? 256 : (int)count; // the instrument command takes a byte
+}
+
+bool jd_instrument_pcm(const JdPlayer* player, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                       uint32_t* loop_frames) {
+    if (inst < 0 || inst >= jd_instrument_count(player)) {
+        return false;
+    }
+    const JdInstrument in = instrument_get(player, (uint8_t)inst);
+    const uint8_t* lo = player->module.data;
+    const uint8_t* hi = lo + player->module.size;
+    const uint8_t* start = (const uint8_t*)in.sample;
+    if (start == nullptr || start < lo || start >= hi || in.sample_words == 0) {
+        return false;
+    }
+    // The part past the file reads as zero for the driver; only what the file holds is PCM.
+    uint32_t length = (uint32_t)in.sample_words * 2;
+    if (length > (uint32_t)(hi - start)) {
+        length = (uint32_t)(hi - start);
+    }
+    *data = in.sample;
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    const uint8_t* repeat = (const uint8_t*)in.repeat;
+    if (in.repeat_words > 1 && repeat != nullptr && repeat >= start && repeat < start + length) {
+        *loop_start = (uint32_t)(repeat - start);
+        *loop_frames = (uint32_t)in.repeat_words * 2;
+        if (*loop_frames > length - *loop_start) {
+            *loop_frames = length - *loop_start;
+        }
+    }
+    return true;
+}
+
 JdVoiceState jd_voice_state(const JdPlayer* player, int voice) {
     if (voice < 0 || voice >= player->version.voices) {
         return (JdVoiceState) { .note = -1, .instrument = -1 };

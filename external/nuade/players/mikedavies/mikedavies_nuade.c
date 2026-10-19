@@ -84,6 +84,23 @@ static uint32_t mikedavies_grid_ticks(void* user_data, uint32_t subsong) {
     return MD_GRID_TICKS;
 }
 
+static uint32_t mikedavies_sample_count(void* user_data) {
+    return md_instrument_count((const MdPlayer*)user_data);
+}
+
+static bool mikedavies_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const MdPlayer* player = (const MdPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!md_instrument_pcm(player, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_mikedavies = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "mikedavies",
@@ -98,6 +115,8 @@ const NuadePlayer nuade_player_mikedavies = {
     .metadata = mikedavies_metadata,
     .voice_info = mikedavies_voice_info,
     .grid_ticks = mikedavies_grid_ticks,
+    .sample_count = mikedavies_sample_count,
+    .sample_get = mikedavies_sample_get,
 };
 
 MdPlayer* md_from_nuade(NuadeSong* song) {

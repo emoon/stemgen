@@ -71,6 +71,20 @@ static uint32_t dariuszendeh_grid_ticks(void* user_data, uint32_t subsong) {
     return DZ_TICKS_PER_ROW;
 }
 
+static uint32_t dariuszendeh_sample_count(void* user_data) {
+    return (uint32_t)dz_instrument_count((const DzPlayer*)user_data);
+}
+
+static bool dariuszendeh_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!dz_instrument_pcm((const DzPlayer*)user_data, (int)n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8 };
+    return true;
+}
+
 const NuadePlayer nuade_player_dariuszendeh = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "dariuszendeh",
@@ -85,6 +99,8 @@ const NuadePlayer nuade_player_dariuszendeh = {
     .metadata = dariuszendeh_metadata,
     .voice_info = dariuszendeh_voice_info,
     .grid_ticks = dariuszendeh_grid_ticks,
+    .sample_count = dariuszendeh_sample_count,
+    .sample_get = dariuszendeh_sample_get,
 };
 
 DzPlayer* dz_from_nuade(NuadeSong* song) {

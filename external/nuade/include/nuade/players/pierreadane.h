@@ -124,6 +124,12 @@ bool pa_start(PaPlayer* player, NuadeVoices* voices);
 PaTickResult pa_tick(PaPlayer* player, NuadeVoices* voices);
 PaVoiceState pa_voice_state(const PaPlayer* player, uint32_t voice);
 
+// The sound of an instrument (1-based, as PaVoiceState.instrument has it) as the voice plays it: 8-bit data inside the
+// player's sample set, its length in bytes and the repeat (length 0: no loop). A looped instrument plays only the part
+// that repeats, which is what this gives. False for a number without a sample.
+bool pa_sample_pcm(const PaPlayer* player, uint32_t number, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 PaPlayer* pa_from_nuade(NuadeSong* song);
 

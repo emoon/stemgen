@@ -28,7 +28,7 @@ extern "C" {
 // Levels of the call stack of sub-sequences and loops that a voice's track keeps.
 #define FP_STACK_LEVELS 8
 
-// Instruments a player numbers for the display; a module has far fewer.
+// Instruments a module numbers; it has far fewer.
 #define FP_MAX_INSTRUMENTS 256
 
 typedef struct FpPlayer FpPlayer;
@@ -72,6 +72,9 @@ typedef struct FpModule {
     uint32_t silence;          // the two words every one-shot sample repeats
     uint32_t instrument_default;
     uint32_t sample_default;
+    // The instruments the songs select, in the order the probe's walk found them: an instrument's number is its index.
+    uint32_t instrument_address[FP_MAX_INSTRUMENTS];
+    uint32_t instrument_count;
 } FpModule;
 
 typedef enum FpModulationKind {
@@ -168,8 +171,6 @@ typedef struct FpVoice {
 
 struct FpPlayer {
     FpModule module;
-    uint32_t instrument_address[FP_MAX_INSTRUMENTS]; // the instruments numbered so far, for the display
-    uint32_t instrument_count;
     FpVoice voices[FP_VOICES];
 
     // The song
@@ -203,6 +204,12 @@ FpTickResult fp_tick(FpPlayer* player, NuadeVoices* voices);
 // Ticks of one step of the track in a subsong (0-based); 0 for a bad subsong.
 uint32_t fp_grid_ticks(const FpPlayer* player, int subsong);
 FpVoiceState fp_voice_state(const FpPlayer* player, int voice);
+
+// The instruments of the module (the ones its songs select, numbered as the voices report them) and the PCM of one:
+// signed 8 bit, `bytes` long, `loops` when it repeats all of it (else it plays once). False for an instrument that
+// plays a sequence of samples or a dynamic sample (a window the modulation tables move through its data).
+uint32_t fp_instrument_count(const FpPlayer* player);
+bool fp_instrument_pcm(const FpPlayer* player, uint32_t number, const int8_t** data, uint32_t* bytes, bool* loops);
 // The module's strings (title, author, info), copied into `out`; empty if there is none.
 void fp_module_string(const FpPlayer* player, uint32_t address, char* out, size_t cap);
 

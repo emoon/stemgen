@@ -83,6 +83,29 @@ static uint32_t cinemaware_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+// Entry n is zone n % CW_ZONES_PER_INSTRUMENT of the instrument block n / CW_ZONES_PER_INSTRUMENT of the file. A sound
+// is numbered like its program for the first zone, and CW_PROGRAMS further for each zone after it.
+static uint32_t cinemaware_sample_count(void* user_data) {
+    return (uint32_t)((const CwPlayer*)user_data)->module.instrument_count * CW_ZONES_PER_INSTRUMENT;
+}
+
+static bool cinemaware_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const uint32_t zone = n % CW_ZONES_PER_INSTRUMENT;
+    CwZonePcm pcm;
+    if (!cw_zone_pcm((const CwPlayer*)user_data, (int)(n / CW_ZONES_PER_INSTRUMENT), (int)zone, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = (uint32_t)pcm.program + zone * CW_PROGRAMS,
+                                 .name = pcm.name,
+                                 .data = pcm.data,
+                                 .frames = pcm.length,
+                                 .bits = 8,
+                                 .rate = pcm.rate,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_cinemaware = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "cinemaware",
@@ -97,6 +120,8 @@ const NuadePlayer nuade_player_cinemaware = {
     .metadata = cinemaware_metadata,
     .voice_info = cinemaware_voice_info,
     .grid_ticks = cinemaware_grid_ticks,
+    .sample_count = cinemaware_sample_count,
+    .sample_get = cinemaware_sample_get,
 };
 
 CwPlayer* cw_from_nuade(NuadeSong* song) {

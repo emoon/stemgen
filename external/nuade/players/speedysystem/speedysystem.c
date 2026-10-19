@@ -76,6 +76,42 @@ SsVoiceState ss_voice_state(const SsPlayer* player, int voice) {
     return (SsVoiceState) { .note = v->note, .instrument = v->instrument };
 }
 
+bool ss_sample_pcm(const SsPlayer* player, int sample, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames) {
+    if (sample < 0 || sample >= SS_SAMPLES) {
+        return false;
+    }
+    const SsModule* m = &player->module;
+    const SsSample* s = &m->samples[sample];
+    if (!s->valid || s->start_len_words == 0 || s->start >= m->size) {
+        return false;
+    }
+    // The one shot part, and the repeat part when the sample has one (it follows the one shot part).
+    uint32_t length = (uint32_t)s->start_len_words * 2;
+    uint32_t loop_at = 0;
+    uint32_t loop_length = 0;
+    if (s->has_repeat && s->repeat_len_words > 1 && s->repeat >= s->start) {
+        loop_at = s->repeat - s->start;
+        loop_length = (uint32_t)s->repeat_len_words * 2;
+        if (loop_at + loop_length > length) {
+            length = loop_at + loop_length;
+        }
+    }
+    if (length > m->size - s->start) {
+        length = (uint32_t)(m->size - s->start);
+    }
+    if (loop_at >= length) {
+        loop_at = loop_length = 0;
+    } else if (loop_length > length - loop_at) {
+        loop_length = length - loop_at;
+    }
+    *data = (const int8_t*)m->data + s->start;
+    *frames = length;
+    *loop_start = loop_at;
+    *loop_frames = loop_length;
+    return true;
+}
+
 // A note: the voice stops, then the delays are set and the sample starts. AUDxLC/AUDxLEN are the DMA start's; the
 // repeat part, if any, follows after the DMA start.
 

@@ -231,6 +231,35 @@ ScoSampleBounds sco_sample_bounds(const ScoModule* module, uint32_t entry_offset
                                .end = base + sco_u32(module, table + entry_offset + 4) };
 }
 
+uint32_t sco_module_instrument_count(const ScoModule* module) {
+    const uint32_t first = module->base[ScoRole_Instruments];
+    uint32_t end = module->size;
+    for (uint32_t role = 0; role < ScoRole_Count; role++) {
+        const uint32_t base = module->base[role];
+        if (base > first && base < end) {
+            end = base;
+        }
+    }
+    if (first >= end) {
+        return 0;
+    }
+    const uint32_t count = (end - first) / SCO_INSTRUMENT_BYTES;
+    return count < SCO_MAX_INSTRUMENTS ? count : SCO_MAX_INSTRUMENTS;
+}
+
+bool sco_pcm_make(const ScoModule* module, uint32_t from, uint32_t bytes, uint32_t loop_at, uint32_t loop_bytes,
+                  ScoPcm* out) {
+    if (bytes == 0 || from >= module->size || bytes > module->size - from) {
+        return false;
+    }
+    const bool loops = loop_bytes > SCO_LOOP_MIN && loop_at < bytes && loop_bytes <= bytes - loop_at;
+    *out = (ScoPcm) { .data = (const int8_t*)module->image + from,
+                      .length = bytes,
+                      .loop_start = loops ? loop_at : 0,
+                      .loop_length = loops ? loop_bytes : 0 };
+    return true;
+}
+
 void sco_registers_write(const ScoModule* module, const ScoRegisters* registers, NuadePaulaChannel* paula) {
     paula->lc = sco_chip(module, registers->lc);
     paula->len_words = registers->len_words;

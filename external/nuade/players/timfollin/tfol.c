@@ -108,7 +108,7 @@ bool tfol_start(TfolPlayer* player, uint32_t subsong, NuadeVoices* voices) {
     }
     TfolModule* m = &player->module;
     memcpy(m->mem, m->original, m->size);
-    player->song = (subsong + 1) & (TFOL_SONGS - 1);
+    player->song = tfol_song_of_subsong(subsong);
     player->song_record = tfol_module_song(m, player->song);
     const TfolSong* song = &player->song_record;
     const bool song_silent = player->song == TFOL_SILENT_SONG;
@@ -519,4 +519,31 @@ TfolTickResult tfol_tick(TfolPlayer* player, NuadeVoices* voices) {
 TfolVoiceState tfol_voice_state(const TfolPlayer* player, uint32_t voice) {
     const TfolVoice* v = &player->voices[voice];
     return (TfolVoiceState) { .period = v->period, .instrument = v->instrument_number };
+}
+
+uint32_t tfol_instrument_count(const TfolPlayer* player) {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < TFOL_INSTRUMENTS; i++) {
+        if (player->module.instrument_known[i]) {
+            count = i + 1;
+        }
+    }
+    return count;
+}
+
+bool tfol_instrument_pcm(const TfolPlayer* player, uint32_t index, const int8_t** data, uint32_t* length) {
+    const TfolModule* m = &player->module;
+    if (index >= TFOL_INSTRUMENTS || !m->instrument_known[index]) {
+        return false;
+    }
+    const TfolSong song = tfol_module_song(m, tfol_song_of_subsong(0));
+    const TfolInstrument inst = tfol_module_instrument(m, song.instrument_table, (uint8_t)index);
+    if (!inst.valid) {
+        return false;
+    }
+    // the file's bytes, not the module memory, which the sweeps of instruments 0..3 change while the song plays; the
+    // sample address clears bit 0 like Paula does
+    *data = (const int8_t*)(m->original + (inst.sample & ~1u));
+    *length = inst.sample_bytes;
+    return true;
 }

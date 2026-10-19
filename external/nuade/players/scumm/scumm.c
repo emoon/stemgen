@@ -432,3 +432,42 @@ ScummVoiceState scumm_voice_state(const ScummPlayer* player, uint32_t voice) {
     const NuadePaulaChannel* paula = &player->paula[voice];
     return (ScummVoiceState) { .period = paula->dma ? paula->period : 0, .instrument = player->last_instrument[voice] };
 }
+
+uint32_t scumm_instrument_count(const ScummPlayer* player) {
+    return player->module.engine->tracker ? player->module.engine->instruments : 0;
+}
+
+bool scumm_instrument_pcm(const ScummPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames,
+                          uint32_t* loop_start, uint32_t* loop_frames) {
+    if (n >= scumm_instrument_count(player)) {
+        return false;
+    }
+    const ScmModule* module = &player->module;
+    if (!module->instrument_used[n]) {
+        return false; // the record is not proven to be one: it may be any other data
+    }
+    const ScmInstrument instrument = scm_module_instrument(module, n);
+    // Paula ignores bit 0 of the address, the sample lies in the module as it was loaded (the driver patches it)
+    const uint32_t start = scm_module_sample_offset(module, instrument.start_offset) & ~1u;
+    const uint32_t bytes = instrument.start_bytes & ~1u;
+    if (bytes == 0 || start >= module->size || bytes > module->size - start) {
+        return false;
+    }
+    uint32_t length = bytes;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The note plays its first sample once, then the loop sample repeats. It is part of the same data when it lies
+    // inside or right behind the first sample; a loop of one word is silence (the driver clears it).
+    const uint32_t loop = scm_module_sample_offset(module, instrument.loop_offset) & ~1u;
+    const uint32_t loop_bytes = instrument.loop_bytes & ~1u;
+    if (loop_bytes > 2 && loop >= start && loop - start <= bytes && loop_bytes <= module->size - loop) {
+        *loop_start = loop - start;
+        *loop_frames = loop_bytes;
+        if (*loop_start + loop_bytes > length) {
+            length = *loop_start + loop_bytes;
+        }
+    }
+    *data = (const int8_t*)(player->pristine + start);
+    *frames = length;
+    return true;
+}

@@ -323,6 +323,19 @@ ScoTickResult sco_tick(ScoPlayer* player, NuadeVoices* voices);
 
 ScoVoiceState sco_voice_state(const ScoPlayer* player, uint32_t voice);
 
+// The sample behind an instrument record: mono 8 bit data inside the module, the loop in bytes (0 length: none).
+typedef struct ScoPcm {
+    const int8_t* data;
+    uint32_t length;
+    uint32_t loop_start;
+    uint32_t loop_length;
+} ScoPcm;
+
+// The instrument records of the module, and the sample an instrument plays; false when the instrument plays a wave form
+// (swept, a sequence of them, the noise buffer) instead of a sample.
+uint32_t sco_instrument_count(const ScoPlayer* player);
+bool sco_instrument_pcm(const ScoPlayer* player, uint32_t instrument, ScoPcm* out);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 ScoPlayer* sco_from_nuade(NuadeSong* song);
 

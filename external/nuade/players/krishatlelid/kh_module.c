@@ -574,6 +574,68 @@ bool kh_prepare_instruments(KhMemory* memory, uint32_t song, uint32_t first, uin
     return true;
 }
 
+static uint32_t subsong_instrument_count(const KhModule* module, uint32_t subsong) {
+    const uint32_t song = kh_module_song(module, &module->song, subsong);
+    uint32_t count = 0;
+    while (count < MAX_INSTRUMENTS && kh_song_instrument(&module->song, song, count) != 0) {
+        count++;
+    }
+    return count;
+}
+
+// The subsongs have their own tables; an instrument number is taken from the first subsong that has it.
+uint32_t kh_module_instrument_count(const KhModule* module) {
+    uint32_t count = 0;
+    for (uint32_t subsong = 0; subsong < module->subsong_count; subsong++) {
+        const uint32_t n = subsong_instrument_count(module, subsong);
+        count = n > count ? n : count;
+    }
+    return count;
+}
+
+bool kh_module_instrument_sound(const KhModule* module, uint32_t index, KhSound* out) {
+    const KhMemory* memory = &module->song;
+    if (index < kh_first_prepared_instrument(module->variant)) {
+        return false;
+    }
+    uint32_t subsong = 0;
+    while (subsong < module->subsong_count && index >= subsong_instrument_count(module, subsong)) {
+        subsong++;
+    }
+    if (subsong == module->subsong_count) {
+        return false;
+    }
+    const uint32_t record = kh_song_instrument(memory, kh_module_song(module, memory, subsong), index);
+    if (!memory_has(memory, record, MAX_INSTRUMENT_BYTES)) {
+        return false;
+    }
+    const uint32_t form = kh_instrument_read(memory, record).form;
+    uint64_t budget = KH_PREPARE_BUDGET_WORDS;
+    const uint32_t vhdr = form != 0 && (form & 1) == 0 ? find_chunk(memory, form, TAG_VHDR, &budget) : 0;
+    if (vhdr == 0 || !memory_has(memory, vhdr, VHDR_BYTES)) {
+        return false;
+    }
+    const KhVhdr header = kh_vhdr_read(memory, vhdr);
+    const uint32_t body = header.octaves != 0 ? find_chunk(memory, vhdr, TAG_BODY, &budget) : 0;
+    const uint64_t octave_bytes = (uint64_t)header.one_shot + header.repeat;
+    if (body == 0 || header.octaves > OCTAVE_SPAN_SEMITONES || octave_bytes == 0) {
+        return false;
+    }
+    // each octave has twice the samples of the one before it; the last one is the finest
+    const uint32_t last = header.octaves - 1u;
+    const uint64_t start = (uint64_t)body + octave_bytes * ((1ull << last) - 1);
+    const uint64_t length = octave_bytes << last;
+    if (start + length > (uint64_t)KH_LOAD_BASE + memory->size || length > UINT32_MAX
+        || !memory_has(memory, (uint32_t)start, (uint32_t)length)) {
+        return false;
+    }
+    *out = (KhSound) { .data = kh_chip_pointer(memory, (uint32_t)start),
+                       .length = (uint32_t)length,
+                       .loop_start = header.repeat != 0 ? header.one_shot << last : 0,
+                       .loop_length = header.repeat << last };
+    return true;
+}
+
 // The song start has to work for every subsong.
 
 static bool songs_prepare(const KhModule* module) {

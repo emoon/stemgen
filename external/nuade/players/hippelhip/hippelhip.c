@@ -476,6 +476,34 @@ HhTickResult hh_tick(HhPlayer* player, NuadeVoices* voices) {
     return (HhTickResult) { .looped = song->looped };
 }
 
+uint32_t hh_sample_count(const HhPlayer* player) {
+    const HhModule* m = &player->module;
+    return m->sample_data > m->samples ? (m->sample_data - m->samples) / HH_SAMPLE_RECORD_SIZE : 0;
+}
+
+bool hh_sample_pcm(const HhPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames) {
+    const HhModule* m = &player->module;
+    if (n >= hh_sample_count(player) || n > UINT8_MAX) {
+        return false;
+    }
+    const HhSample sample = hh_sample(m, (uint8_t)n);
+    const uint64_t length = (uint64_t)sample.length * 2;
+    const uint64_t offset = (uint64_t)m->sample_data + sample.start;
+    // a sample pack holds several sounds under one number: they are not told apart here
+    if (length == 0 || offset + length > m->size || hh_sample_pack(m, (uint8_t)n).magic) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + offset;
+    *frames = (uint32_t)length;
+    // a repeat of one word (or none) is the "no loop" the replayer writes
+    const bool loops
+        = sample.loop_length > 1 && (uint64_t)sample.loop_offset + (uint64_t)sample.loop_length * 2 <= length;
+    *loop_start = loops ? sample.loop_offset : 0;
+    *loop_frames = loops ? (uint32_t)sample.loop_length * 2 : 0;
+    return true;
+}
+
 int hh_speed(const HhPlayer* player) {
     return player->song.reload;
 }

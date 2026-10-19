@@ -69,6 +69,22 @@ static uint32_t specialfx_voice_info(void* user_data, NuadeVoiceInfo* out, uint3
     return count;
 }
 
+static uint32_t specialfx_sample_count(void* user_data) {
+    return (uint32_t)jd_instrument_count((const JdPlayer*)user_data);
+}
+
+static bool specialfx_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!jd_instrument_pcm((const JdPlayer*)user_data, (int)n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 static uint32_t specialfx_grid_ticks(void* user_data, uint32_t subsong) {
     (void)user_data;
     (void)subsong;
@@ -89,6 +105,8 @@ const NuadePlayer nuade_player_specialfx = {
     .metadata = specialfx_metadata,
     .voice_info = specialfx_voice_info,
     .grid_ticks = specialfx_grid_ticks,
+    .sample_count = specialfx_sample_count,
+    .sample_get = specialfx_sample_get,
 };
 
 JdPlayer* jd_from_nuade(NuadeSong* song) {

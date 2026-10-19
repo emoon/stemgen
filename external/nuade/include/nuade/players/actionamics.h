@@ -302,6 +302,9 @@ bool act_tick(ActModule* module);
 // Sample names, for display.
 int act_get_sample_count(const ActModule* module);
 const char* act_get_sample_name(const ActModule* module, int samp);
+// The PCM of a sample as the song loads it, in bytes. False for an empty sample.
+bool act_sample_pcm(const ActModule* module, int samp, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length);
 
 ActPosition act_position(const ActModule* module);
 ActVoiceState act_voice_state(const ActModule* module, int voice);

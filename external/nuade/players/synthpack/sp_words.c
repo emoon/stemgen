@@ -51,6 +51,22 @@ static unsigned sp_word_instrument_count(const SpMemory* set) {
 
 // The header of instrument `index`; false if the table has no such entry or the header lies outside the set.
 
+static bool sp_word_instrument(const SpMemory* set, unsigned index, SpWordInstrument* instrument);
+
+unsigned sp_word_instrument_total(const SpMemory* set) {
+    const unsigned listed = sp_word_instrument_count(set);
+    return listed < SP_INSTRUMENTS ? listed : SP_INSTRUMENTS;
+}
+
+bool sp_word_instrument_wave(const SpMemory* set, unsigned index, SpWave* wave) {
+    SpWordInstrument instrument;
+    if (!sp_word_instrument(set, index, &instrument)) {
+        return false;
+    }
+    *wave = instrument.wave;
+    return true;
+}
+
 static bool sp_word_instrument(const SpMemory* set, unsigned index, SpWordInstrument* instrument) {
     const bool listed = index < SP_INSTRUMENTS && index < sp_word_instrument_count(set);
     const uint32_t offset = listed ? sp_u16(set, 2u * index) : 0;

@@ -71,6 +71,22 @@ static uint32_t forgottenworlds_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t forgottenworlds_sample_count(void* user_data) {
+    return fw_instrument_count((const FwPlayer*)user_data);
+}
+
+static bool forgottenworlds_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t bytes, loop_start, loop_bytes;
+    if (!fw_instrument_pcm((const FwPlayer*)user_data, n, &data, &bytes, &loop_start, &loop_bytes)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = bytes, .bits = 8, .loop_start = loop_start, .loop_frames = loop_bytes
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_forgottenworlds = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "forgottenworlds",
@@ -85,6 +101,8 @@ const NuadePlayer nuade_player_forgottenworlds = {
     .metadata = forgottenworlds_metadata,
     .voice_info = forgottenworlds_voice_info,
     .grid_ticks = forgottenworlds_grid_ticks,
+    .sample_count = forgottenworlds_sample_count,
+    .sample_get = forgottenworlds_sample_get,
 };
 
 FwPlayer* fw_from_nuade(NuadeSong* song) {

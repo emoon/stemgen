@@ -174,6 +174,13 @@ CdTickResult cd_tick(CdPlayer* player, NuadeVoices* voices);
 CdInfo cd_info(const CdPlayer* player);
 CdVoiceState cd_voice_state(const CdPlayer* player, int voice);
 
+// The number of instrument records; the numbers cd_voice_state reports index them.
+int cd_instrument_count(const CdPlayer* player);
+// The PCM of instrument `inst`: its sample, and the part that repeats (loop_length 0: none). False for a record
+// without a sample inside the module.
+bool cd_instrument_pcm(const CdPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 CdPlayer* cd_from_nuade(NuadeSong* song);
 

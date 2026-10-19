@@ -93,6 +93,55 @@ PshTickResult psh_tick(PshPlayer* p, NuadeVoices* voices) {
     return (PshTickResult) { .looped = p->song_end, .ended = ended };
 }
 
+// The last built-in wave form is the replayer's own code bytes, which a song can select but which are no sound.
+#define CODE_SAMPLE (PSH_SAMPLE_COUNT + PSH_WAVE_COUNT - 1)
+
+uint32_t psh_sample_count(const PshPlayer* player) {
+    const PshModule* m = &player->module;
+    if (m->layout->kind != PshKind_Old) {
+        return m->sample_count;
+    }
+    uint32_t count = 0;
+    for (uint32_t n = 0; n < 64; n++) {
+        if ((m->used_instruments >> n & 1u) != 0) {
+            count = n + 1;
+        }
+    }
+    return count;
+}
+
+bool psh_sample_pcm(const PshPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length) {
+    const PshModule* m = &player->module;
+    const PshSample* sample = nullptr;
+    if (m->layout->kind == PshKind_Old) {
+        if (number < 64 && (m->used_instruments >> number & 1u) != 0) {
+            sample = psh_instrument_sample(m, (int64_t)m->instruments + (int64_t)number * PSH_OLD_INSTRUMENT_SIZE);
+        }
+    } else if (number != CODE_SAMPLE) {
+        sample = psh_sample_number(m, number);
+    }
+    if (sample == nullptr || sample->length_words == 0) {
+        return false;
+    }
+    const uint32_t start = sample->start & ~1u; // Paula drops bit 0 of the address
+    const uint32_t chip_end = m->wave_base + PSH_WAVE_DATA_SIZE;
+    uint32_t bytes = 2u * sample->length_words;
+    if (start >= chip_end) {
+        return false;
+    }
+    bytes = bytes < chip_end - start ? bytes : chip_end - start;
+    *data = (const int8_t*)m->chip + start;
+    *length = bytes;
+    const bool loops = sample->loop != m->silence && sample->loop >= start && sample->loop - start < bytes;
+    const uint32_t loop_at = sample->loop - start;
+    *loop_start = loops ? loop_at : 0;
+    *loop_length
+        = loops ? (2u * sample->loop_length_words < bytes - loop_at ? 2u * sample->loop_length_words : bytes - loop_at)
+                : 0;
+    return true;
+}
+
 PshVoiceState psh_voice_state(const PshPlayer* p, int voice) {
     if (voice < 0 || voice >= PSH_VOICES) {
         return (PshVoiceState) { .note = -1, .instrument = -1 };

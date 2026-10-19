@@ -740,6 +740,30 @@ TmeVoiceState tme_voice_state(const TmePlayer* p, int voice) {
     return (TmeVoiceState) { .note = v->note, .instrument = v->instrument };
 }
 
+bool tme_instrument_pcm(const TmePlayer* p, uint32_t index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    const TmeModule* m = &p->module;
+    if (index >= TME_INSTRUMENTS || !m->instruments[index].has_sample) {
+        return false;
+    }
+    const TmeInstrument* ins = &m->instruments[index];
+    // a length of 0 words plays 65536; the sample may be cut short by the end of the file
+    const uint32_t played = (ins->length_words != 0 ? (uint32_t)ins->length_words : 65536u) * 2;
+    const uint32_t available = m->size > ins->sample_offset ? m->size - ins->sample_offset : 0;
+    const uint32_t bytes = played < available ? played : available;
+    if (bytes == 0) {
+        return false;
+    }
+    const uint32_t start = ins->loop_start_words * 2;
+    const uint32_t repeat = (uint32_t)ins->loop_length_words * 2;
+    const bool loops = ins->loop_length_words > 1 && start < bytes;
+    *data = (const int8_t*)m->image + (ins->sample_offset & ~1u);
+    *length = bytes;
+    *loop_start = loops ? start : 0;
+    *loop_length = loops ? (repeat < bytes - start ? repeat : bytes - start) : 0;
+    return true;
+}
+
 TmeCell tme_pattern_cell(const TmePlayer* p, uint32_t order, uint32_t voice, uint32_t row) {
     const TmeModule* m = &p->module;
     if (order >= m->position_count || voice >= TME_VOICES || row >= TME_ROWS) {

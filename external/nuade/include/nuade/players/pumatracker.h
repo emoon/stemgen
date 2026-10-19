@@ -23,6 +23,7 @@ extern "C" {
 #define PUMA_TICK_LENGTH 14187
 
 #define PUMA_SAMPLE_COUNT 10
+#define PUMA_WAVEFORM_COUNT 42
 #define PUMA_MAX_TRACKS 256
 #define PUMA_MAX_INSTRUMENTS 66
 
@@ -143,6 +144,15 @@ void puma_destroy(PumaPlayer* player);
 
 // The song name stored in the header (12 characters, not terminated).
 const char* puma_title(const PumaPlayer* player);
+
+// A sound a sequence can select: 0..PUMA_SAMPLE_COUNT-1 the module's samples, then the PUMA_WAVEFORM_COUNT single-cycle
+// waveforms built into the player (the numbers the sequences use). False for a sample slot the module leaves empty.
+typedef struct PumaSourcePcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_frames; // 0 = plays once
+} PumaSourcePcm;
+bool puma_source_pcm(const PumaPlayer* player, uint32_t n, PumaSourcePcm* out);
 
 // (Re)start from the first position; the player drives `voices` (Paula channel n = voice n).
 bool puma_start(PumaPlayer* player, NuadeVoices* voices);

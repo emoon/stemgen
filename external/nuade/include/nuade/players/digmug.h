@@ -273,6 +273,11 @@ void dm_get_cell(const DmModule* module, int track_idx, int row, uint8_t* note, 
                  uint8_t* effect_arg);
 void dm_set_cell(DmModule* module, int track_idx, int row, uint8_t note, uint8_t instrument, uint8_t effect,
                  uint8_t effect_arg);
+// The sound a note of instrument `inst` (0-based) starts with: its sample, or the waveform (one cycle, repeated) from
+// the module as loaded. A Digital Mugician 1 instrument with an instrument effect starts from a copy of its first
+// source waveform, which the effect then morphs while the note plays. False for an instrument whose sound is missing.
+bool dm_instrument_pcm(const DmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
 float dm_get_instrument_param(const DmModule* module, int inst, const char* param);
 void dm_set_instrument_param(DmModule* module, int inst, const char* param, float value);
 size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size);

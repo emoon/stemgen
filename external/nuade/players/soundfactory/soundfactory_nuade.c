@@ -80,6 +80,25 @@ static uint32_t soundfactory_grid_ticks(void* user_data, uint32_t subsong) {
     return SOUNDFACTORY_TICKS_PER_ROW;
 }
 
+static uint32_t soundfactory_sample_count(void* user_data) {
+    return (uint32_t)sf_get_instrument_count((const SfModule*)user_data);
+}
+
+static bool soundfactory_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    uint32_t number, frames, loop_start, loop_frames;
+    const int8_t* data;
+    if (!sf_instrument_pcm((const SfModule*)user_data, (int)n, &number, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = number,
+                                 .data = data,
+                                 .frames = frames,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundfactory = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundfactory",
@@ -91,6 +110,8 @@ const NuadePlayer nuade_player_soundfactory = {
     .close = soundfactory_close,
     .start = soundfactory_start,
     .tick = soundfactory_tick,
+    .sample_count = soundfactory_sample_count,
+    .sample_get = soundfactory_sample_get,
     .metadata = soundfactory_metadata,
     .voice_info = soundfactory_voice_info,
     .grid_ticks = soundfactory_grid_ticks,

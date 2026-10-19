@@ -103,3 +103,36 @@ DnsVoiceState dns_voice_state(const DnsPlayer* player, int voice) {
     const DnsVoice* v = &player->voices[voice];
     return (DnsVoiceState) { .note = v->display_note, .instrument = v->display_instrument };
 }
+
+uint32_t dns_sample_count(const DnsPlayer* player) {
+    return dns_instrument_count(&player->module, player->samples.size);
+}
+
+bool dns_sample_pcm(const DnsPlayer* player, uint32_t n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length) {
+    if (n >= dns_sample_count(player)) {
+        return false;
+    }
+    const DnsInstrument in = dns_read_instrument(&player->module, n);
+    const uint32_t start = in.start & ~1u;
+    const uint32_t loop = in.loop & ~1u;
+    uint32_t first = (uint32_t)in.start_words * 2;
+    if (first == 0) {
+        return false;
+    }
+    *loop_start = 0;
+    *loop_length = 0;
+    // The sound plays its first run once, then repeats the loop run. It is one sound with a loop when the loop lies in
+    // or directly after the first run; a loop elsewhere (the silent run at the start of the samples) is not part of it.
+    if (in.loop_words > 1 && loop >= start && loop <= start + first) {
+        const uint32_t loop_end = loop + (uint32_t)in.loop_words * 2;
+        *loop_start = loop - start;
+        *loop_length = (uint32_t)in.loop_words * 2;
+        if (loop_end > start + first) {
+            first = loop_end - start;
+        }
+    }
+    *data = (const int8_t*)(player->samples.data + start);
+    *length = first;
+    return true;
+}

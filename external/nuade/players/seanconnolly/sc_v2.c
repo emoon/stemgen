@@ -869,3 +869,20 @@ void sc2_init(Sco2* s, ScoModule* module, uint32_t subsong, bool first, NuadePau
         paula[i].volume = 0;
     }
 }
+
+// The sample of an instrument as a note starts it (note_wave): an 8SVX body, one shot and then the repeat, or the raw
+// bytes of the sample table entry behind the replayer's header offset. Wave forms (sweeps, sequences) are no sample.
+bool sc2_instrument_pcm(const ScoModule* m, uint32_t instrument, ScoPcm* out) {
+    const Instrument in = instrument_read(m, instrument);
+    const uint8_t type = in.mode & 0xF;
+    if (type == WaveType_Sweep || type == WaveType_Sequence) {
+        return false;
+    }
+    const ScoSampleBounds bounds = sample_bounds(m, in.sample);
+    const Svx svx = svx_read(m, bounds.start);
+    if (svx.valid) {
+        const uint32_t repeat = (int16_t)svx.repeat > (int16_t)SCO_LOOP_MIN ? svx.repeat : 0;
+        return sco_pcm_make(m, svx.body, (uint32_t)svx.oneshot + svx.repeat, svx.oneshot, repeat, out);
+    }
+    return bounds.end >= svx.body + 2 && sco_pcm_make(m, svx.body, bounds.end - 2 - svx.body, 0, 0, out);
+}

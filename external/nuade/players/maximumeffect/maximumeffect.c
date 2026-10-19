@@ -369,3 +369,30 @@ MxeVoiceState mxe_voice_state(const MxePlayer* player, int voice) {
     const MxeVoice* v = &player->voices[voice];
     return (MxeVoiceState) { .period = v->shown_period, .instrument = v->shown_instrument };
 }
+
+int mxe_instrument_count(const MxePlayer* player) {
+    return (int)player->samples.instrument_count;
+}
+
+bool mxe_instrument_pcm(const MxePlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    if (n < 0 || (uint32_t)n >= player->samples.instrument_count) {
+        return false;
+    }
+    const MxeInstrument instrument = mxe_instrument(&player->samples, (uint32_t)n);
+    const uint32_t bytes = 2u * instrument.length_words;
+    // length 0 plays 65536 words; one that leaves the file is not a sound the song can play
+    if (bytes == 0 || instrument.start > player->samples.size || bytes > player->samples.size - instrument.start) {
+        return false;
+    }
+    const uint32_t first = instrument.start & ~1u;
+    *data = (const int8_t*)(player->samples.bytes + first);
+    *length = bytes;
+    // the repeat is a second read of the sample file: it is a loop of the sound when it lies inside it
+    const uint32_t repeat = instrument.loop_start & ~1u;
+    const uint32_t repeat_bytes = 2u * instrument.loop_words;
+    const bool inside = repeat >= first && repeat_bytes > 2 && repeat - first + repeat_bytes <= bytes;
+    *loop_start = inside ? repeat - first : 0;
+    *loop_length = inside ? repeat_bytes : 0;
+    return true;
+}

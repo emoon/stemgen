@@ -20,6 +20,9 @@ extern "C" {
 
 #define PS_VOICES 4
 
+// The instrument range tables of a song that the sample export knows of (a song has one or a few).
+#define PS_MAX_RANGE_TABLES 16
+
 // The CIA clock: the timebase of the tick length.
 #define PS_TIMEBASE_HZ 709379
 
@@ -35,7 +38,7 @@ typedef struct PsTickResult {
 
 typedef struct PsVoiceState {
     int period;     // the period of the last note started, 0 if none
-    int instrument; // the index of the instrument range of that note, -1 if none
+    int instrument; // the instrument range of that note, -1 if none; see ps_instrument_count
 } PsVoiceState;
 
 typedef struct PsVoice {
@@ -82,6 +85,9 @@ struct PsPlayer {
     bool fault;     // the data led out of what the port models
     uint32_t steps; // commands the voice being run has read in this tick
     PsVoice voices[PS_VOICES];
+    // The instrument range tables the subsongs select (by an instrument command), found by a dry run at ps_create.
+    uint32_t range_tables[PS_MAX_RANGE_TABLES];
+    uint32_t range_table_count;
 };
 
 // The eagleplayer's Check2, plus what this port needs: the locators find their code in the image, the subsong count is
@@ -102,6 +108,14 @@ bool ps_start(PsPlayer* player, uint32_t subsong, NuadeVoices* voices);
 PsTickResult ps_tick(PsPlayer* player, NuadeVoices* voices);
 
 PsVoiceState ps_voice_state(const PsPlayer* player, uint32_t voice);
+
+// The instruments of the song, numbered as PsVoiceState.instrument is: the instrument ranges of every table the
+// subsongs select (found by a dry run at ps_create), one after the other in the order the tables were found. (The
+// engine itself only knows the index of a range in the table a voice selected, which names different sounds in
+// different tables.) ps_instrument_pcm gives the sample of a range: 8-bit data inside the player's image and its length
+// in bytes (a note plays it once). False for a range without a sample.
+uint32_t ps_instrument_count(const PsPlayer* player);
+bool ps_instrument_pcm(const PsPlayer* player, uint32_t index, const int8_t** data, uint32_t* length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 PsPlayer* ps_from_nuade(NuadeSong* song);

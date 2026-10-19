@@ -210,6 +210,13 @@ MdlTickResult mdl_tick(MdlPlayer* player, NuadeVoices* voices);
 
 MdlVoiceState mdl_voice_state(const MdlPlayer* player, int voice);
 
+// The instrument table, numbered as MdlVoiceState.instrument (the table entry minus one). A sample, looped-window or
+// one-shot instrument plays 8-bit PCM from its wave (for a note range with no wave of its own, the nearest below);
+// the sound is the wave of the lowest note range. A synth instrument builds its sound at run time: false.
+// `loop_length` 0: the sound does not repeat as a whole.
+int mdl_sample_count(MdlPlayer* player);
+bool mdl_sample_pcm(MdlPlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 MdlPlayer* mdl_from_nuade(NuadeSong* song);
 

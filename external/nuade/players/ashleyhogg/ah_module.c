@@ -203,18 +203,28 @@ static bool tables_inside(const AhMemory* m, const uint32_t* offsets, size_t cou
 
 // The furthest AUDxLC of the old family: the attack or the loop of an instrument (the Paula tail covers the lengths).
 
+// The instrument table runs up to the arpeggio table when that follows it, else the table is as long as a record number
+// can address.
+
+uint32_t ah_old_instrument_count(const AhOld* old) {
+    const AhOldTables* t = &old->tables;
+    if (t->arp_offsets > t->instruments) {
+        return (t->arp_offsets - t->instruments) / OLD_INSTRUMENT_SIZE;
+    }
+    return MAX_RECORDS;
+}
+
 uint64_t ah_old_samples_end(const AhOld* old, const AhMemory* module) {
     const AhOldTables* t = &old->tables;
     uint64_t end = module->size;
-    const uint32_t first = t->instruments;
-    const uint32_t last = t->arp_offsets > first ? t->arp_offsets : first + MAX_RECORDS * OLD_INSTRUMENT_SIZE;
-    for (uint32_t record = first; record + OLD_INSTRUMENT_SIZE <= last; record += OLD_INSTRUMENT_SIZE) {
-        const AhOldInstrument in = ah_old_read_instrument(module, record);
+    const uint32_t count = ah_old_instrument_count(old);
+    for (uint32_t i = 0; i < count; i++) {
+        const AhOldInstrument in = ah_old_read_instrument(module, t->instruments + i * OLD_INSTRUMENT_SIZE);
         const uint64_t ends[2]
             = { in.wave_table ? 0 : (uint64_t)t->samples + in.sample, (uint64_t)t->samples + in.loop };
-        for (size_t i = 0; i < nuade_sizeof_array(ends); i++) {
-            if (ends[i] < MAX_PADDED_END && ends[i] > end) {
-                end = ends[i];
+        for (size_t j = 0; j < nuade_sizeof_array(ends); j++) {
+            if (ends[j] < MAX_PADDED_END && ends[j] > end) {
+                end = ends[j];
             }
         }
     }

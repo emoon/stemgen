@@ -267,3 +267,36 @@ SilVoiceState sil_voice_state(const SilPlayer* player, int voice) {
     const SilChannel* c = &player->music.channels[voice];
     return (SilVoiceState) { .note = c->note, .instrument = c->instrument };
 }
+
+uint32_t sil_slot_count(const SilPlayer* player) {
+    (void)player;
+    return SIL_SLOTS;
+}
+
+bool sil_slot_pcm(const SilPlayer* player, uint32_t slot, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                  uint32_t* loop_length) {
+    if (slot >= SIL_SLOTS || player->script_initial.slots[slot].sample == 0) {
+        return false;
+    }
+    const uint32_t sample = player->script_initial.slots[slot].sample;
+    SilBlock header;
+    if (sample < SIL_SAMPLE_HEADER || !sil_block_read(&player->memory, sample - SIL_SAMPLE_HEADER, &header)
+        || header.size <= SIL_SAMPLE_HEADER) {
+        return false;
+    }
+    const uint32_t bytes = header.size - SIL_SAMPLE_HEADER;
+    if (!sil_in_memory(&player->memory, sample, bytes)) {
+        return false;
+    }
+    *data = (const int8_t*)(player->memory.data + sample);
+    *length = bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    // A loop start of 0 means no loop; the loop ends at the loop end, or where the data does
+    const uint32_t end = header.loop_end != 0 && header.loop_end < bytes ? header.loop_end : bytes;
+    if (header.loop_start != 0 && end > header.loop_start) {
+        *loop_start = header.loop_start;
+        *loop_length = end - header.loop_start;
+    }
+    return true;
+}

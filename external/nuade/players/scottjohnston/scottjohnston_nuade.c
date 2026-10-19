@@ -81,6 +81,25 @@ static uint32_t scottjohnston_grid_ticks(void* user_data, uint32_t subsong) {
     return sj_ticks_per_row();
 }
 
+static uint32_t scottjohnston_sample_count(void* user_data) {
+    (void)user_data;
+    return SJ_INSTRUMENT_SLOTS;
+}
+
+static bool scottjohnston_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    SjInstrumentPcm pcm;
+    if (!sj_instrument_pcm((const SjPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n + 1,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_scottjohnston = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "scottjohnston",
@@ -95,6 +114,8 @@ const NuadePlayer nuade_player_scottjohnston = {
     .metadata = scottjohnston_metadata,
     .voice_info = scottjohnston_voice_info,
     .grid_ticks = scottjohnston_grid_ticks,
+    .sample_count = scottjohnston_sample_count,
+    .sample_get = scottjohnston_sample_get,
 };
 
 SjPlayer* sj_from_nuade(NuadeSong* song) {

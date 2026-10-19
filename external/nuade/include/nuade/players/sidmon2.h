@@ -227,6 +227,10 @@ void sd2_set_cell(Sd2Module* module, int track_idx, int row, int note, int instr
 
 // Instrument preview API
 int sd2_get_instrument_count(const Sd2Module* module);
+// The PCM a note of the instrument (0-based) starts: the first sample of its waveform list, as the module holds it.
+// False for an instrument without one.
+bool sd2_instrument_pcm(const Sd2Module* module, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
 void sd2_preview_note_on(Sd2Module* module, int instrument, int note, int velocity);
 void sd2_preview_note_off(Sd2Module* module);
 

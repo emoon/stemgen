@@ -1496,3 +1496,66 @@ FcCell fc_cell(const FcModule* module, int order, int voice, int row) {
     cell.flags = line->info & 0xc0;
     return cell;
 }
+
+// The sounds: the 90 waveform slots (10 samples, 80 wavetables), then the 20 entries of each multi sample in the order
+// of their slots.
+
+#define FC_MULTI_ENTRIES 20
+
+static uint32_t multi_sample_count(const FcModule* module) {
+    uint32_t count = 0;
+    for (int i = 0; i < FC_SAMPLE_COUNT; i++) {
+        count += module->samp_info[i].multi != nullptr;
+    }
+    return count;
+}
+
+uint32_t fc_sound_count(const FcModule* module) {
+    return FC_SAMPLE_COUNT + multi_sample_count(module) * FC_MULTI_ENTRIES;
+}
+
+bool fc_sound_pcm(const FcModule* module, uint32_t n, uint32_t* number, const int8_t** data, uint32_t* length,
+                  uint32_t* loop_start, uint32_t* loop_length) {
+    const int8_t* address = nullptr;
+    uint32_t bytes = 0;
+    uint32_t start = 0;
+    uint32_t loop = 0;
+    if (n < FC_SAMPLE_COUNT) {
+        const FcSample* sample = &module->samp_info[n];
+        *number = n;
+        address = sample->address;
+        bytes = sample->length;
+        start = sample->loop_start;
+        loop = sample->loop_length;
+    } else {
+        uint32_t multi = (n - FC_SAMPLE_COUNT) / FC_MULTI_ENTRIES;
+        const uint32_t entry = (n - FC_SAMPLE_COUNT) % FC_MULTI_ENTRIES;
+        for (int i = 0; i < FC_SAMPLE_COUNT; i++) {
+            if (module->samp_info[i].multi == nullptr) {
+                continue;
+            }
+            if (multi-- == 0) {
+                const FcMultiSampleEntry* sample = &module->samp_info[i].multi->sample[entry];
+                *number = FC_SAMPLE_COUNT + (uint32_t)i * FC_MULTI_ENTRIES + entry;
+                address = sample->address;
+                bytes = sample->length;
+                start = sample->loop_start;
+                loop = sample->loop_length;
+                break;
+            }
+        }
+    }
+    if (address == nullptr || bytes == 0) {
+        return false;
+    }
+    *data = address;
+    *length = bytes;
+    // a loop of two bytes or less is not set; one that runs past the end is cut at it
+    *loop_start = 0;
+    *loop_length = 0;
+    if (loop > 2 && start < bytes) {
+        *loop_start = start;
+        *loop_length = start + loop > bytes ? bytes - start : loop;
+    }
+    return true;
+}

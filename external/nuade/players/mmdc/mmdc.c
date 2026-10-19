@@ -549,6 +549,30 @@ void mmdc_destroy(MmdcPlayer* player) {
     }
 }
 
+bool mmdc_sample_pcm(const MmdcPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                     uint32_t* loop_start, uint32_t* loop_length) {
+    const MmdcModule* module = &player->module;
+    if (index >= module->sample_count || !module->samples[index].present) {
+        return false;
+    }
+    const MmdcSample sample = module->samples[index];
+    // the data may be cut short by the end of the module
+    const uint32_t available = player->image.size > sample.data ? player->image.size - sample.data : 0;
+    const uint32_t bytes = sample.length < available ? sample.length : available;
+    if (bytes == 0) {
+        return false;
+    }
+    const MmdcInstrument instrument = module->song.instruments[index];
+    const uint32_t start = 2u * instrument.repeat_start;
+    const uint32_t repeat = 2u * instrument.repeat_words;
+    const bool loops = instrument.repeat_words > LOOP_DUMMY_WORDS && start < bytes;
+    *data = (const int8_t*)player->memory + sample.data;
+    *length = bytes;
+    *loop_start = loops ? start : 0;
+    *loop_length = loops ? (repeat < bytes - start ? repeat : bytes - start) : 0;
+    return true;
+}
+
 bool mmdc_start(MmdcPlayer* player, NuadeVoices* voices) {
     if (player == nullptr || voices == nullptr) {
         return false;

@@ -350,6 +350,66 @@ ApsTickResult aps_tick(ApsPlayer* p, NuadeVoices* voices) {
     return (ApsTickResult) { .looped = p->looped, .ended = p->ended };
 }
 
+// The instrument records lie in their section, which the envelope section follows after its length long.
+int aps_sample_count(const ApsPlayer* player) {
+    const ApsModule* m = &player->module;
+    return m->envelopes > m->instruments + 4 ? (int)((m->envelopes - 4 - m->instruments) / APS_INSTRUMENT_SIZE) : 0;
+}
+
+bool aps_sample_pcm(const ApsPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length) {
+    const ApsModule* m = &player->module;
+    const int count = (int)((m->sample_data - 4 - m->sample_records) / APS_SAMPLE_RECORD_SIZE);
+    if (instrument < 0 || instrument >= aps_sample_count(player)) {
+        return false;
+    }
+    // the record the instrument names for a note (a track entry may offset it)
+    const int first = aps_instrument(m, m->instruments + (uint32_t)instrument * APS_INSTRUMENT_SIZE).sample;
+    uint64_t first_at = 0;
+    uint64_t end = 0;
+    bool loops = false;
+    uint64_t loop_at = 0;
+    bool started = false;
+    for (int r = first; r < count; r++) {
+        const ApsSampleRecord part = aps_sample_record(m, m->sample_records + (uint32_t)r * APS_SAMPLE_RECORD_SIZE);
+        if (part.kind != ApsKind_Loop && part.kind != ApsKind_Once && part.kind != ApsKind_Chain) {
+            // a chain that ends in the silent record is a one shot; anything else makes no PCM
+            if (started && part.kind == ApsKind_Silence) {
+                break;
+            }
+            return false;
+        }
+        const uint64_t at = (uint64_t)m->sample_data + (uint64_t)part.address * 2;
+        const uint64_t part_end = at + (uint64_t)part.length_words * 2;
+        if (part.length_words == 0 || part_end > m->size) {
+            return false;
+        }
+        if (!started) {
+            first_at = at;
+        } else if (at != end) {
+            return false;
+        }
+        started = true;
+        loop_at = at;
+        end = part_end;
+        if (part.kind == ApsKind_Loop) {
+            loops = part.length_words > 1;
+            break;
+        }
+        if (part.kind == ApsKind_Once) {
+            break;
+        }
+    }
+    if (!started) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + first_at;
+    *length = (uint32_t)(end - first_at);
+    *loop_start = loops ? (uint32_t)(loop_at - first_at) : 0;
+    *loop_length = loops ? (uint32_t)(end - loop_at) : 0;
+    return true;
+}
+
 ApsVoiceState aps_voice_state(const ApsPlayer* p, int voice) {
     const ApsVoice* v = &p->voices[voice];
     return (ApsVoiceState) { .note = v->shown_note, .instrument = v->shown_instrument };

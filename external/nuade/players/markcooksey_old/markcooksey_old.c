@@ -64,6 +64,7 @@
 #define SUBSONG_MAX 255
 #define VOICE_ENTRY_SIZE 4  // a long per voice in the subsong table
 #define SAMPLE_ENTRY_SIZE 4 // a long in the sample table
+#define SAMPLE_MAX 64       // the instrument command's byte is a multiple of 4
 
 // Commands are `bra.w` entries: the command byte is the offset in the table.
 #define COMMAND_ENTRY_SIZE 4
@@ -621,4 +622,37 @@ bool mco_start(McoPlayer* player, int subsong, NuadeVoices* voices) {
 McoVoiceState mco_voice_state(const McoPlayer* player, int voice) {
     const McoVoice* v = &player->voices[voice];
     return (McoVoiceState) { .note = v->shown_note, .instrument = v->shown_instrument };
+}
+
+// The sample table ends where its first sample starts (the samples follow the table in order of the table).
+int mco_sample_count(const McoPlayer* player) {
+    const McoModule* m = &player->module;
+    uint32_t end = SAMPLE_MAX * SAMPLE_ENTRY_SIZE;
+    int count = 0;
+    while ((uint32_t)count * SAMPLE_ENTRY_SIZE < end && m->samples + (uint32_t)(count + 1) * SAMPLE_ENTRY_SIZE <= m->size) {
+        const uint32_t offset = data_u32(m, m->samples + (uint32_t)count * SAMPLE_ENTRY_SIZE);
+        if (offset < end) {
+            end = offset;
+        }
+        count++;
+    }
+    return count;
+}
+
+bool mco_sample_pcm(const McoPlayer* player, int n, const int8_t** data, uint32_t* length) {
+    const McoModule* m = &player->module;
+    if (n < 0 || n >= mco_sample_count(player)) {
+        return false;
+    }
+    const uint32_t offset = m->samples + data_u32(m, m->samples + (uint32_t)n * SAMPLE_ENTRY_SIZE);
+    uint16_t words;
+    const int8_t* pcm = sample_data(m, offset, &words);
+    if (pcm == nullptr || words == 0 || offset + SAMPLE_HEADER_BYTES > m->size) {
+        return false;
+    }
+    // what the file holds of it: the replayer would play on into whatever follows
+    const uint32_t available = (uint32_t)m->size - (offset + SAMPLE_HEADER_BYTES);
+    *data = pcm;
+    *length = (uint32_t)words * 2 < available ? (uint32_t)words * 2 : available;
+    return *length != 0;
 }

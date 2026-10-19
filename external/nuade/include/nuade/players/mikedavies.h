@@ -124,6 +124,14 @@ MdTickResult md_tick(MdPlayer* player, NuadeVoices* voices);
 
 MdVoiceState md_voice_state(const MdPlayer* player, uint32_t voice);
 
+// The instruments of the module's table (the numbers a voice's instrument command selects).
+uint32_t md_instrument_count(const MdPlayer* player);
+
+// The sample of an instrument as the replayer hands it to Paula: 8-bit data inside the player's module copy, its length
+// in bytes, and the repeat in bytes (length 0: the instrument does not loop). False for an instrument without data.
+bool md_instrument_pcm(const MdPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 MdPlayer* md_from_nuade(NuadeSong* song);
 

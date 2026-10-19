@@ -211,6 +211,13 @@ int sd1_note_semitone(const Sd1Player* player, int note);
 #define SD1_SAMPLE_NAME_SIZE 20
 bool sd1_sample_name(const Sd1Player* player, int instrument, char out[SD1_SAMPLE_NAME_SIZE + 1]);
 
+// The sounds that can be asked for with sd1_instrument_pcm (the instruments, and the fixed samples of the old replayer
+// behind them when the song uses them) and the PCM of one (the 1-based `instrument` of a row): the data as the module
+// holds it, the loop inside it. False for a synthesised instrument or one out of range.
+int sd1_exportable_count(const Sd1Player* player);
+bool sd1_instrument_pcm(const Sd1Player* player, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 Sd1Player* sd1_from_nuade(NuadeSong* song);
 

@@ -71,6 +71,22 @@ static uint32_t amcomposer_grid_ticks(void* user_data, uint32_t subsong) {
     return AMC_TICKS_PER_STEP;
 }
 
+static uint32_t amcomposer_sample_count(void* user_data) {
+    return (uint32_t)amc_instrument_count((const AmcPlayer*)user_data);
+}
+
+static bool amcomposer_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!amc_instrument_pcm((const AmcPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_amcomposer = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "amcomposer",
@@ -85,6 +101,8 @@ const NuadePlayer nuade_player_amcomposer = {
     .metadata = amcomposer_metadata,
     .voice_info = amcomposer_voice_info,
     .grid_ticks = amcomposer_grid_ticks,
+    .sample_count = amcomposer_sample_count,
+    .sample_get = amcomposer_sample_get,
 };
 
 AmcPlayer* amc_from_nuade(NuadeSong* song) {

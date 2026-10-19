@@ -182,6 +182,12 @@ bool jd_start(JdPlayer* player, int subsong, NuadeVoices* voices);
 JdTickResult jd_tick(JdPlayer* player, NuadeVoices* voices);
 JdVoiceState jd_voice_state(const JdPlayer* player, int voice);
 
+// The instrument numbers the module can select (0..count-1), and the PCM of one: the sample part (one shot and repeat,
+// 8 bit) with the loop inside it. False for a number without sample data.
+int jd_instrument_count(const JdPlayer* player);
+bool jd_instrument_pcm(const JdPlayer* player, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                       uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 JdPlayer* jd_from_nuade(NuadeSong* song);
 

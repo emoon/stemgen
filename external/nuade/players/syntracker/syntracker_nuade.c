@@ -124,6 +124,28 @@ static uint32_t syntracker_tracker_cells(void* user_data, const NuadePosition* a
     return nuade_tracker_fill(at, STK_VOICES, STK_ROWS, channel, row_lo, row_hi, out, cap, syntracker_cell, user_data);
 }
 
+static uint32_t syntracker_sample_count(void* user_data) {
+    (void)user_data;
+    return STK_INSTRUMENTS;
+}
+
+static bool syntracker_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const StkPlayer* player = (const StkPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!stk_instrument_pcm(player, (int)n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = stk_instrument_name(player, (int)n),
+                                 .data = data,
+                                 .frames = frames,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_syntracker = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "syntracker",
@@ -140,6 +162,8 @@ const NuadePlayer nuade_player_syntracker = {
     .voice_info = syntracker_voice_info,
     .tracker_info = syntracker_tracker_info,
     .tracker_cells = syntracker_tracker_cells,
+    .sample_count = syntracker_sample_count,
+    .sample_get = syntracker_sample_get,
 };
 
 StkPlayer* stk_from_nuade(NuadeSong* song) {

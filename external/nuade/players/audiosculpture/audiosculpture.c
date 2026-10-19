@@ -904,6 +904,36 @@ void asc_sample_name(const AscPlayer* player, int index, char out[ASC_NAME_SIZE]
     memcpy(out, player->samples[index].name, ASC_NAME_SIZE);
 }
 
+bool asc_sample_pcm(const AscPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length, const char** name) {
+    if (index < 0 || index >= ASC_INSTRUMENTS || player->am[index + 1].present) {
+        return false;
+    }
+    const AscSampleHeader* header = &player->samples[index];
+    const uint32_t offset = player->sample_offsets[index];
+    // a replayer plays the first pass up to the end of the repeat when the repeat does not start at the sample's start
+    const uint32_t first_pass_words = header->loop_start_words != 0
+                                          ? (uint32_t)header->loop_start_words + header->loop_length_words
+                                          : header->length_words;
+    const uint64_t bytes = 2u * (uint64_t)first_pass_words;
+    if (bytes == 0 || (uint64_t)offset + bytes > player->module.size) {
+        return false;
+    }
+    *data = (const int8_t*)player->module.data + offset;
+    *length = (uint32_t)bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (header->loop_length_words > 1) {
+        *loop_start = 2u * header->loop_start_words;
+        *loop_length = 2u * header->loop_length_words;
+        if (*loop_start + *loop_length > *length) {
+            *loop_length = *length - *loop_start;
+        }
+    }
+    *name = header->name;
+    return true;
+}
+
 AscPosition asc_position(const AscPlayer* player) {
     return player->shown;
 }

@@ -234,6 +234,22 @@ uint32_t qt_tempo(const QtPlayer* player) {
     return player->module.tempo;
 }
 
+bool qt_sample_pcm(const QtPlayer* player, uint32_t n, QtSamplePcm* out) {
+    if (n >= QT_SAMPLES) {
+        return false;
+    }
+    // the range a note on this sample hands to Paula (voice_start_note)
+    const QtSampleEntry* sample = &player->samples.entry[n];
+    const uint16_t length = sample->length_override != 0 ? sample->length_override : sample->length_words;
+    const int8_t* data = qt_samples_lc(&player->samples, sample->start + sample->offset, length);
+    if (data == nullptr || length == 0) {
+        return false;
+    }
+    const bool loops = ((player->samples.loop_mask >> n) & 1) != 0;
+    *out = (QtSamplePcm) { .data = data, .frames = (uint32_t)length * 2, .loops = loops };
+    return true;
+}
+
 QtVoiceState qt_voice_state(const QtPlayer* player, uint32_t voice) {
     if (voice >= QT_VOICES || !player->voices[voice].has_note) {
         return (QtVoiceState) { .period = 0, .instrument = -1 };

@@ -121,6 +121,25 @@ static uint32_t davidhanney_tracker_cells(void* user_data, const NuadePosition* 
     return nuade_tracker_fill(at, DH_VOICES, rows, channel, row_lo, row_hi, out, cap, davidhanney_cell, user_data);
 }
 
+static uint32_t davidhanney_sample_count(void* user_data) {
+    (void)user_data;
+    return DH_INSTRUMENTS;
+}
+
+static bool davidhanney_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    (void)user_data;
+    const int8_t* data;
+    uint32_t length;
+    bool loops;
+    if (!dh_instrument_pcm((int)n, &data, &length, &loops)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_frames = loops ? length : 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_davidhanney = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "davidhanney",
@@ -137,6 +156,8 @@ const NuadePlayer nuade_player_davidhanney = {
     .voice_info = davidhanney_voice_info,
     .tracker_info = davidhanney_tracker_info,
     .tracker_cells = davidhanney_tracker_cells,
+    .sample_count = davidhanney_sample_count,
+    .sample_get = davidhanney_sample_get,
 };
 
 DhPlayer* dh_from_nuade(NuadeSong* song) {

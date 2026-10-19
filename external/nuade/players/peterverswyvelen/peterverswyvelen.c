@@ -718,6 +718,35 @@ uint32_t pv_grid_ticks(const PvPlayer* player) {
     return player->speed != 0 ? player->speed : 1;
 }
 
+bool pv_sample_pcm(const PvPlayer* player, uint32_t index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    if (index >= PV_SAMPLES) {
+        return false;
+    }
+    const PvSampleHeader header = sample_header(player->mem, player->size, index);
+    const uint32_t start = player->sample_start[index];
+    // the first block is the whole sample, or up to the end of the repeat when there is a repeat start; a sample that
+    // plays once repeats a block of its first bytes, silent unless the repeat is longer than one word
+    uint32_t words = header.length_words;
+    uint32_t repeat_from = 0;
+    if (header.loop_start_words != 0) {
+        words = (uint32_t)header.loop_start_words + header.loop_words;
+        repeat_from = (uint32_t)header.loop_start_words * 2;
+    }
+    uint32_t bytes = words * 2;
+    if (bytes == 0 || start >= player->size) {
+        return false;
+    }
+    bytes = bytes < player->size - start ? bytes : (uint32_t)player->size - start;
+    const uint32_t repeat = (uint32_t)header.loop_words * 2;
+    const bool loops = header.loop_words > 1 && repeat_from < bytes;
+    *data = (const int8_t*)player->mem + start;
+    *length = bytes;
+    *loop_start = loops ? repeat_from : 0;
+    *loop_length = loops ? (repeat < bytes - repeat_from ? repeat : bytes - repeat_from) : 0;
+    return true;
+}
+
 PvVoiceState pv_voice_state(const PvPlayer* player, uint32_t voice) {
     const PvVoice* v = &player->voices[voice];
     return (PvVoiceState) { .period = v->last_period, .instrument = v->last_sample };

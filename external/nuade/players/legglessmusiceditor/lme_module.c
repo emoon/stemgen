@@ -253,6 +253,32 @@ const int8_t* lme_sample_at(const LmeModule* module, uint32_t offset) {
     return (const int8_t*)(module->bytes + module->samples + (offset & ~1u));
 }
 
+bool lme_instrument_pcm(const LmeModule* module, uint32_t index, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames) {
+    if (module == nullptr || index >= module->instrument_count) {
+        return false;
+    }
+    const LmeInstrument instrument = lme_instrument(module, index);
+    // a synth wave is generated while it plays
+    if (instrument.wave.type != LmeWaveType_Sample || instrument.length_words == 0) {
+        return false;
+    }
+    const uint32_t start = instrument.sample_offset & ~1u;
+    const uint32_t length = (uint32_t)instrument.length_words * 2;
+    *data = lme_sample_at(module, instrument.sample_offset);
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // the loop is its own address; it is exported when it lies inside the sample
+    const uint32_t loop = instrument.loop_offset & ~1u;
+    const uint32_t loop_length = (uint32_t)instrument.loop_words * 2;
+    if (loop_length > 2 && loop >= start && loop - start + loop_length <= length) {
+        *loop_start = loop - start;
+        *loop_frames = loop_length;
+    }
+    return true;
+}
+
 // The pulse width grows by one step per tick up to the maximum (the test is the sign of the difference, as in the
 // replayer), then shrinks to the minimum and grows again.
 

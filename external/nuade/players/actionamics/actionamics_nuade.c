@@ -143,6 +143,28 @@ static uint32_t actionamics_tracker_cells(void* user_data, const NuadePosition* 
                               cap, actionamics_cell, module);
 }
 
+static uint32_t actionamics_sample_count(void* user_data) {
+    return (uint32_t)act_get_sample_count((const ActModule*)user_data);
+}
+
+static bool actionamics_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const ActModule* module = (const ActModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!act_sample_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = act_get_sample_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_actionamics = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "actionamics",
@@ -159,6 +181,8 @@ const NuadePlayer nuade_player_actionamics = {
     .voice_info = actionamics_voice_info,
     .tracker_info = actionamics_tracker_info,
     .tracker_cells = actionamics_tracker_cells,
+    .sample_count = actionamics_sample_count,
+    .sample_get = actionamics_sample_get,
 };
 
 ActModule* act_from_nuade(NuadeSong* song) {

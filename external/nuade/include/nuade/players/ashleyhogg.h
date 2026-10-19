@@ -250,6 +250,13 @@ AhTickResult ah_tick(AhPlayer* player, NuadeVoices* voices);
 
 // Ticks one sequencer step spans (the song's speed); 0 for a bad subsong.
 uint32_t ah_grid_ticks(const AhPlayer* player, int subsong);
+// The sounds of the song, numbered as the voice state numbers them (the instrument record of the old family, the
+// sample record of the new one), and the PCM of one in bytes. False for a sound without PCM: an instrument that plays
+// the wave table, one without a sample, or a sound whose repeat does not follow from its start in the sample data.
+int ah_sample_count(const AhPlayer* player);
+bool ah_sample_pcm(const AhPlayer* player, int sound, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 AhVoiceState ah_voice_state(const AhPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

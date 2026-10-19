@@ -198,6 +198,12 @@ bool sil_start(SilPlayer* player, uint32_t subsong, NuadeVoices* voices);
 SilTickResult sil_tick(SilPlayer* player, NuadeVoices* voices);
 SilVoiceState sil_voice_state(const SilPlayer* player, int voice);
 
+// The instrument slots (SIL_SLOTS) and the PCM of one as the script of InitPlayer set it up (a subsong's script may
+// change a slot when it starts). Loop in bytes, 0 length for none. False for an empty slot.
+uint32_t sil_slot_count(const SilPlayer* player);
+bool sil_slot_pcm(const SilPlayer* player, uint32_t slot, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                  uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SilPlayer* sil_from_nuade(NuadeSong* song);
 

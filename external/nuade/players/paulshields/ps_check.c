@@ -65,7 +65,7 @@ static bool instrument_exists(const PshModule* m, int64_t at) {
 
 // The commands of one pattern of the old layout, up to the one that leaves it.
 
-static bool check_old_pattern(const PshModule* m, int64_t at) {
+static bool check_old_pattern(PshModule* m, int64_t at) {
     for (int guard = 0; guard < (int)m->size + PSH_COMMAND_LIMIT && at < (int64_t)m->size; guard++) {
         const uint8_t byte = psh_u8(m, at++);
         if (byte < PshOldPatternCommand_Rest) {
@@ -88,6 +88,7 @@ static bool check_old_pattern(const PshModule* m, int64_t at) {
                 if (!instrument_exists(m, at)) {
                     return false;
                 }
+                m->used_instruments |= UINT64_C(1) << (psh_u8(m, at) / PSH_OLD_INSTRUMENT_SIZE);
                 at++;
                 break;
             case PshOldPatternCommand_NextPattern:
@@ -106,7 +107,7 @@ static bool check_old_pattern(const PshModule* m, int64_t at) {
 
 // One voice: its order list up to the loop or stop code, with every pattern it names checked once.
 
-static bool check_voice(const PshModule* m, int64_t at, bool* seen) {
+static bool check_voice(PshModule* m, int64_t at, bool* seen) {
     for (int guard = 0; guard < (int)m->size + PSH_COMMAND_LIMIT; guard++) {
         const uint16_t word = psh_u16(m, at);
         at += 2;
@@ -146,7 +147,7 @@ static bool check_voice(const PshModule* m, int64_t at, bool* seen) {
     return true;
 }
 
-bool psh_check_song(const PshModule* m) {
+bool psh_check_song(PshModule* m) {
     bool* seen = calloc((size_t)m->size + 1, sizeof(bool));
     if (seen == nullptr) {
         return false;

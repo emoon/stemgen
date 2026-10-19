@@ -78,6 +78,20 @@ static uint32_t markcooksey_old_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t markcooksey_old_sample_count(void* user_data) {
+    return (uint32_t)mco_sample_count((const McoPlayer*)user_data);
+}
+
+static bool markcooksey_old_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!mco_sample_pcm((const McoPlayer*)user_data, (int)n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8 };
+    return true;
+}
+
 const NuadePlayer nuade_player_markcooksey_old = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "markcooksey_old",
@@ -92,6 +106,8 @@ const NuadePlayer nuade_player_markcooksey_old = {
     .metadata = markcooksey_old_metadata,
     .voice_info = markcooksey_old_voice_info,
     .grid_ticks = markcooksey_old_grid_ticks,
+    .sample_count = markcooksey_old_sample_count,
+    .sample_get = markcooksey_old_sample_get,
 };
 
 McoPlayer* mco_from_nuade(NuadeSong* song) {

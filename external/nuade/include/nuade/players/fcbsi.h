@@ -88,6 +88,11 @@ FcBsiTickResult fcbsi_tick(FcBsiPlayer* player, NuadeVoices* voices);
 uint32_t fcbsi_grid_ticks(void);
 FcBsiVoiceState fcbsi_voice_state(const FcBsiPlayer* player, int voice);
 
+// The PCM of instrument `inst` (0 .. FC_INSTRUMENT_COUNT - 1): signed 8 bit, sizes in bytes. False for an instrument
+// without data.
+bool fcbsi_instrument_pcm(const FcBsiPlayer* player, int inst, const int8_t** data, uint32_t* length,
+                          uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 FcBsiPlayer* fcbsi_from_nuade(NuadeSong* song);
 

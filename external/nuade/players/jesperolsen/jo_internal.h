@@ -223,6 +223,21 @@ static inline JoVoiceState jo_shown_state(bool playing, uint16_t period, int ins
     return (JoVoiceState) { .note = nuade_period_to_note(period), .instrument = instrument };
 }
 
+// A sound of `bytes` bytes at `start` with the loop at module offset `loop` (`loop_bytes` 0: none). The loop is given
+// when it lies inside the sound. False when the sound is empty or not inside the module.
+static inline bool jo_make_sound(const JoModule* m, uint32_t start, uint32_t bytes, uint32_t loop, uint32_t loop_bytes,
+                                 JoSound* out) {
+    if (bytes == 0 || (uint64_t)start + bytes > m->size) {
+        return false;
+    }
+    *out = (JoSound) { .data = (const int8_t*)m->data + start, .length = bytes };
+    if (loop_bytes != 0 && loop >= start && (uint64_t)loop + loop_bytes <= (uint64_t)start + bytes) {
+        out->loop_start = loop - start;
+        out->loop_length = loop_bytes;
+    }
+    return true;
+}
+
 // JoReplayer C (the Lollypop / Georg Glaxo data modules), jo_c.c
 
 bool jo_c_detect(const JoModule* m);
@@ -230,6 +245,8 @@ int jo_c_subsong_count(const JoModule* m);
 void jo_c_start(JoC* c, const JoModule* m, int subsong);
 JoTickResult jo_c_tick(JoC* c, const JoModule* m, NuadeVoices* voices);
 JoVoiceState jo_c_voice_state(const JoC* c, int voice);
+uint32_t jo_c_instrument_count(const JoModule* m);
+bool jo_c_instrument_sound(const JoModule* m, uint32_t number, JoSound* out);
 
 // JoReplayer B (the Harald Hardtand data modules), jo_b.c
 
@@ -247,3 +264,5 @@ int jo_a_subsong_count(const JoAVersion* version, const JoModule* m);
 void jo_a_start(JoA* a, const JoAVersion* version, const JoModule* m, int subsong);
 JoTickResult jo_a_tick(JoA* a, const JoModule* m, NuadeVoices* voices);
 JoVoiceState jo_a_voice_state(const JoA* a, int voice);
+uint32_t jo_a_instrument_count(const JoAVersion* version);
+bool jo_a_instrument_sound(const JoAVersion* version, const JoModule* m, uint32_t number, JoSound* out);

@@ -77,6 +77,7 @@ typedef struct MonModule {
     uint32_t songs; // the song data
     uint32_t subsong_count;
     uint32_t instruments; // the instrument records, behind the song records
+    uint32_t instrument_count; // one past the highest instrument number a pattern the songs reach selects
 } MonModule;
 
 // Where a note is in its sample start: a note-on stops the DMA, the next tick writes the sample and starts it, the one
@@ -173,6 +174,12 @@ bool mon_start(MonPlayer* player, int subsong, NuadeVoices* voices);
 MonTickResult mon_tick(MonPlayer* player, NuadeVoices* voices);
 
 MonVoiceState mon_voice_state(const MonPlayer* player, int voice);
+
+// The PCM of instrument `number`: its sample, or for an instrument that plays a list of waves the first wave of the
+// list (the one a note-on starts with; the list goes on through its other waves). False for an empty instrument.
+// Loop in frames (bytes), loop_frames 0 when the sample plays once.
+bool mon_instrument_pcm(const MonPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 MonPlayer* mon_from_nuade(NuadeSong* song);

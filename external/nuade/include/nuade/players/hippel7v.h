@@ -187,6 +187,12 @@ bool h7v_start(H7vPlayer* player, int subsong, uint32_t sample_rate, NuadeVoices
 
 H7vTickResult h7v_tick(H7vPlayer* player, NuadeVoices* voices);
 
+// The records of the sample table, and the PCM of one (`n` is the sample number the frequency sequences use). False for
+// a record that has no PCM inside the module (empty, or a sample pack, which is not told apart from a plain sample).
+uint32_t h7v_sample_count(const H7vPlayer* player);
+bool h7v_sample_pcm(const H7vPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                    uint32_t* loop_frames);
+
 // Ticks per sequencer step of the running subsong.
 int h7v_speed(const H7vPlayer* player);
 

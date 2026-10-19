@@ -127,6 +127,22 @@ static uint32_t timetracker_tracker_cells(void* user_data, const NuadePosition* 
     return nuade_tracker_fill(at, TT_VOICES, TT_ROWS, channel, row_lo, row_hi, out, cap, timetracker_cell, user_data);
 }
 
+static uint32_t timetracker_sample_count(void* user_data) {
+    return (uint32_t)((const TtPlayer*)user_data)->module.sample_count;
+}
+
+static bool timetracker_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!tt_sample_pcm((const TtPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_timetracker = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "timetracker",
@@ -143,6 +159,8 @@ const NuadePlayer nuade_player_timetracker = {
     .voice_info = timetracker_voice_info,
     .tracker_info = timetracker_tracker_info,
     .tracker_cells = timetracker_tracker_cells,
+    .sample_count = timetracker_sample_count,
+    .sample_get = timetracker_sample_get,
 };
 
 TtPlayer* tt_from_nuade(NuadeSong* song) {

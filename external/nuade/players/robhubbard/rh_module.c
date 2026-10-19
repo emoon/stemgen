@@ -444,6 +444,29 @@ RhInstrument rh_module_read_instrument(const RhModule* module, uint32_t record) 
     return ins;
 }
 
+bool rh_module_sample_pcm(const RhModule* module, uint32_t index, RhSamplePcm* out) {
+    if (index >= module->sample_count) {
+        return false;
+    }
+    // the samples follow each other behind their headers (sample_headers_fit checked them at open)
+    uint32_t at = module->samples;
+    for (uint32_t i = 0; i < index; i++) {
+        at += SAMPLE_HEADER_SIZE + read_sample_header(module->image, at).bytes;
+    }
+    const uint32_t bytes = read_sample_header(module->image, at).bytes & ~1u;
+    if (bytes == 0) {
+        return false;
+    }
+    // the instrument record keeps the repeat as the file has it: the offset of the loop in bytes, 0 for none
+    const int32_t repeat = (int32_t)rh_module_u32(module, rh_module_instrument(module, index) + InstrumentField_Repeat);
+    *out = (RhSamplePcm) { .data = (const int8_t*)module->image + at + SAMPLE_HEADER_SIZE, .frames = bytes };
+    if (repeat > 0 && (uint32_t)repeat < bytes) {
+        out->loop_start = (uint32_t)repeat;
+        out->loop_frames = bytes - (uint32_t)repeat;
+    }
+    return true;
+}
+
 void rh_module_reset(RhModule* module) {
     memcpy(module->data, module->image, module->size);
     // The init walks the sample headers and fills in the sample, length and base period of one instrument record for

@@ -610,3 +610,11 @@ DbVoiceState db_voice_state(const DbPlayer* player, int voice) {
     const DbVoice* v = &player->voices[voice];
     return (DbVoiceState) { .note = v->note, .instrument = v->instrument };
 }
+
+int db_program_count(const DbPlayer* player) {
+    return (int)player->module.program_count;
+}
+
+bool db_program_pcm(const DbPlayer* player, int program, const int8_t** data, uint32_t* length) {
+    return program > 0 && program < 256 && db_module_program_pcm(&player->module, (uint8_t)program, data, length);
+}

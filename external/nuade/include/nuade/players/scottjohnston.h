@@ -164,6 +164,16 @@ const char* sj_format_name(const SjPlayer* player);
 uint32_t sj_ticks_per_row(void);
 SjVoiceState sj_voice_state(const SjPlayer* player, uint32_t voice);
 
+// The sound of instrument slot `slot` (0-based; a note's instrument number is slot + 1): the 8SVX body, its one-shot
+// part and the loop behind it. False for a slot the song's instrument files do not fill.
+typedef struct SjInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = plays once
+} SjInstrumentPcm;
+bool sj_instrument_pcm(const SjPlayer* player, uint32_t slot, SjInstrumentPcm* out);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SjPlayer* sj_from_nuade(NuadeSong* song);
 

@@ -405,6 +405,66 @@ TronicVoiceState tronic_voice_state(const TronicPlayer* player, int voice) {
                                 .instrument = v->has_instrument ? v->instrument_number - 1 : -1 };
 }
 
+int tronic_instrument_count(const TronicPlayer* player) {
+    return (int)player->module.instrument_count;
+}
+
+// The bytes [at, at + bytes) of the module, 0 if they are not all inside it.
+static const int8_t* module_bytes(const TronicModule* module, int64_t at, uint32_t bytes) {
+    if (at < 0 || bytes == 0 || (uint64_t)at + bytes > module->size) {
+        return nullptr;
+    }
+    return (const int8_t*)(module->data + at);
+}
+
+bool tronic_instrument_pcm(const TronicPlayer* player, int index, const int8_t** data, uint32_t* length,
+                           uint32_t* loop_start, uint32_t* loop_length) {
+    // The readers flag reads outside the file in the module they get; a copy keeps the player's own const.
+    TronicModule module = player->module;
+    TronicInstrument instrument;
+    if (index < 0 || !tronic_instrument(&module, (unsigned)index + 1, &instrument) || instrument.length_words == 0) {
+        return false;
+    }
+    const uint32_t bytes = (uint32_t)instrument.length_words * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (instrument.is_sample) {
+        // The first part plays once, then the repeat: the same sample from loop_offset for loop_words.
+        const int64_t start = sample_start(&module, instrument.param);
+        *data = module_bytes(&module, start, bytes);
+        if (*data == nullptr) {
+            return false;
+        }
+        *length = bytes;
+        const int64_t repeat = (int64_t)(int16_t)instrument.loop_offset;
+        // a repeat of a word or less is the "no loop" of the Amiga
+        if (instrument.loop_words > 1 && repeat >= 0 && (uint64_t)repeat + instrument.loop_words * 2u <= bytes) {
+            *loop_start = (uint32_t)repeat;
+            *loop_length = (uint32_t)instrument.loop_words * 2;
+        }
+        return true;
+    }
+    // A waveform list: the note starts on the waveform of the first step (a jump first goes to the step it names) and
+    // the list moves on from there. The one exported is that first waveform, looped.
+    uint8_t pos = 0;
+    uint8_t waveform = tronic_instrument_byte(&module, &instrument, TronicField_Steps);
+    if (waveform == WAVEFORM_JUMP) {
+        pos = tronic_instrument_byte(&module, &instrument, TronicField_Steps + 1u);
+        waveform = tronic_instrument_byte(&module, &instrument, TronicField_Steps + pos);
+        if (waveform == WAVEFORM_JUMP) {
+            return false;
+        }
+    }
+    const int16_t offset = (int16_t)tronic_word(&module, module.waveform_index + 2u * waveform);
+    *data = module_bytes(&module, (int64_t)module.waveforms + offset, bytes);
+    if (*data == nullptr) {
+        return false;
+    }
+    *length = bytes;
+    *loop_length = bytes;
+    return true;
+}
+
 TronicCell tronic_pattern_cell(const TronicPlayer* player, int order, int voice, int row) {
     // The readers flag reads outside the file in the module they get; a copy keeps the player's own const.
     TronicModule module = player->module;

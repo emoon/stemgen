@@ -15,6 +15,7 @@
 #include "nuade_utils.h"
 #include <nuade/players/synthdream.h>
 
+#define SDR_INSTRUMENT_BYTES 32
 #define SDR_WAVE_WORDS (SDR_WAVE_BYTES / 2)
 #define SDR_WAVE_PRESETS 16
 

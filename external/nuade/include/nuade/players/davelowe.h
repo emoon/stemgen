@@ -262,6 +262,9 @@ struct DlPlayer {
     uint32_t subsong_count;
     uint32_t first_sample_record; // for the display: sample records are 14 bytes each
     DlEngine engine;
+    uint32_t* records; // the sample records the songs select, sorted (see dl_sample_count), owned
+    uint32_t record_count;
+    bool records_found;
 };
 
 // The eagleplayers' Check2 of the three kinds of module.
@@ -282,6 +285,13 @@ bool dl_start(DlPlayer* player, uint32_t subsong);
 DlTickResult dl_tick(DlPlayer* player, NuadeVoices* voices);
 
 DlVoiceState dl_voice_state(const DlPlayer* player, int voice);
+
+// The sounds the songs select, found by reading their patterns: dl_sample_count() entries. The entry's `instrument` is
+// the number dl_voice_state reports for it. False for a record without sound data inside the module. `loop_length` 0:
+// the sound does not loop; `loop_start` and the lengths are in bytes.
+uint32_t dl_sample_count(DlPlayer* player);
+bool dl_sample_pcm(DlPlayer* player, uint32_t n, int* instrument, const int8_t** data, uint32_t* length,
+                   uint32_t* loop_start, uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 DlPlayer* dl_from_nuade(NuadeSong* song);

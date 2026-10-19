@@ -1018,6 +1018,54 @@ int is1_default_rows(const Is1Module* module) {
     return module->current_song_info != nullptr ? module->current_song_info->rows_per_track : 0;
 }
 
+int is1_instrument_count(const Is1Module* module) {
+    return module->num_instruments;
+}
+
+bool is1_instrument_pcm(const Is1Module* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    const Is1Instrument* instr = instrument_at(module, (uint8_t)(inst + 1));
+    if (inst < 0 || inst >= 255 || instr == nullptr || instr->waveform_length == 0) {
+        return false;
+    }
+    if (instr->synthesis_enabled) {
+        // The stored single cycle waveform the voice starts from (before the envelope generator works on it).
+        if (instr->waveform_number >= module->num_waveforms) {
+            return false;
+        }
+        *data = module->waveforms[instr->waveform_number];
+        *length = instr->waveform_length < SYNTH_SAMPLE_SIZE ? instr->waveform_length : SYNTH_SAMPLE_SIZE;
+        *loop_start = 0;
+        *loop_length = *length;
+        return true;
+    }
+    const uint8_t sample_num = instr->waveform_number & 0x3f;
+    if (sample_num >= module->num_samples) {
+        return false;
+    }
+    const Is1Sample* sample = &module->samples[sample_num];
+    // The window of the sample the instrument plays, and its repeat as the player sets it up
+    uint32_t play_length = instr->waveform_length;
+    uint32_t start = 0;
+    uint32_t loop = 0;
+    if (instr->repeat_length == 0) {
+        loop = instr->waveform_length;
+    } else if (instr->repeat_length != 2) {
+        play_length += instr->repeat_length;
+        start = instr->waveform_length;
+        loop = instr->repeat_length;
+    }
+    if (sample->sample_addr == nullptr || sample->length == 0) {
+        return false;
+    }
+    *data = sample->sample_addr;
+    *length = play_length < sample->length ? play_length : sample->length;
+    const bool loops = loop != 0 && start + loop <= *length;
+    *loop_start = loops ? start : 0;
+    *loop_length = loops ? loop : 0;
+    return true;
+}
+
 Is1VoiceState is1_voice_state(const Is1Module* module, int voice) {
     const Is1VoiceInfo* vi = &module->voices[voice];
     return (Is1VoiceState) { .note = vi->transposed_note, .instrument = vi->transposed_instrument };

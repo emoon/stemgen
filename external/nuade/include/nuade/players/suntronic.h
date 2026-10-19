@@ -180,6 +180,12 @@ SunTickResult sun_tick(SunPlayer* player, NuadeVoices* voices);
 const char* sun_format_name(const SunPlayer* player);
 SunVoiceState sun_voice_state(const SunPlayer* player, uint32_t voice);
 
+// The synth instruments (what sun_voice_state numbers) and the waveform one starts from, its first stored cycle (8
+// bit; the replayer loops it and morphs it towards the second). False for an instrument without a waveform.
+uint32_t sun_instrument_count(const SunPlayer* player);
+bool sun_instrument_pcm(const SunPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SunPlayer* sun_from_nuade(NuadeSong* song);
 

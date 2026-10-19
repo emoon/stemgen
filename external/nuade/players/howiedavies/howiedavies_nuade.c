@@ -85,6 +85,22 @@ static uint32_t howiedavies_grid_ticks(void* user_data, uint32_t subsong) {
     return hd_grid_ticks((const HdPlayer*)user_data);
 }
 
+static uint32_t howiedavies_sample_count(void* user_data) {
+    return hd_sample_count((const HdPlayer*)user_data);
+}
+
+static bool howiedavies_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!hd_sample_pcm((const HdPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_howiedavies = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "howiedavies",
@@ -99,6 +115,8 @@ const NuadePlayer nuade_player_howiedavies = {
     .metadata = howiedavies_metadata,
     .voice_info = howiedavies_voice_info,
     .grid_ticks = howiedavies_grid_ticks,
+    .sample_count = howiedavies_sample_count,
+    .sample_get = howiedavies_sample_get,
 };
 
 HdPlayer* hd_from_nuade(NuadeSong* song) {

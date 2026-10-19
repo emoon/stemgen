@@ -222,6 +222,13 @@ bool dl_new_locate(DlImage* image, DlNewModule* module);
 DlSubsong dl_new_subsong(const DlImage* image, const DlNewModule* module, uint32_t index);
 DlVariant dl_new_variant(const DlNewModule* module);
 
+// The number a sample record is shown as: its index in the table of the module, or the low half of its address.
+int dl_instrument_of_record(const DlPlayer* player, uint32_t record);
+
+// Static walk of the songs: every sample record that a pattern of a subsong (or the effect it requests) selects.
+// Sorted, without duplicates; the caller owns the array.
+uint32_t* dl_collect_sample_records(const DlPlayer* player, uint32_t* count);
+
 // Engine
 
 // The volume ramp of some drivers: the music volume is the envelope minus `level`, which counts down from

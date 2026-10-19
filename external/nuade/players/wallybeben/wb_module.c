@@ -48,7 +48,6 @@
 #define FIX_WORD_VALUE 0x0FA0u
 #define FIX_AMOUNT 0x50u
 
-#define INSTRUMENT_BYTES 8u
 #define ENVELOPE_BYTES 8u
 #define ARP_TABLE_BYTES 8u
 #define ZERO_REGS_BYTES 32u
@@ -537,9 +536,9 @@ static bool check_layout(const WbModule* m, uint32_t instrument_count) {
     extents[count++]
         = (Extent) { m->addr[WbRole_Songs], m->subsong_count * WB_SONG_BYTES + m->pattern_count * 4, true };
     extents[count++] = (Extent) { m->addr[WbRole_Samples], m->sample_count * 4, true };
-    extents[count++] = (Extent) { m->addr[WbRole_Instr], instrument_count * INSTRUMENT_BYTES, false };
+    extents[count++] = (Extent) { m->addr[WbRole_Instr], instrument_count * WB_INSTRUMENT_BYTES, false };
     // the record that ends the count: its first long is read after the tables are relocated
-    const Extent end_record = { m->addr[WbRole_Instr] + instrument_count * INSTRUMENT_BYTES, 4, false };
+    const Extent end_record = { m->addr[WbRole_Instr] + instrument_count * WB_INSTRUMENT_BYTES, 4, false };
     for (uint32_t i = 0; i < count; i++) {
         if (!in_range(m->size, extents[i].at, extents[i].bytes) || extents[i].at < m->code_end) {
             return false;
@@ -623,10 +622,10 @@ static bool load_tables(WbModule* m, const Scan* scan, WbBudget* budget) {
     const uint32_t instr = m->addr[WbRole_Instr];
     uint32_t count = 0;
     for (;;) {
-        if (!in_range(m->size, instr + count * INSTRUMENT_BYTES, INSTRUMENT_BYTES) || count > 0xFFu) {
+        if (!in_range(m->size, instr + count * WB_INSTRUMENT_BYTES, WB_INSTRUMENT_BYTES) || count > 0xFFu) {
             return false;
         }
-        const uint8_t* record = img + instr + count * INSTRUMENT_BYTES;
+        const uint8_t* record = img + instr + count * WB_INSTRUMENT_BYTES;
         if (record[0] != (uint8_t)count || nuade_read_be16(record + 2) == 0) {
             break;
         }
@@ -635,6 +634,7 @@ static bool load_tables(WbModule* m, const Scan* scan, WbBudget* budget) {
     if (count == 0 || count > m->sample_count) {
         return false;
     }
+    m->instrument_count = count;
     // the eagleplayer makes the sample pointers even by adding one to all of them when the lowest is odd. It takes the
     // lowest as a signed 32-bit number of the relocated longs: one that does not fit 24 bits is not modelled.
     uint32_t lowest_sample = UINT32_MAX;
@@ -873,8 +873,8 @@ static bool read_record(const WbModule* m, uint32_t at, uint8_t* out, uint32_t b
 }
 
 bool wb_module_instrument(const WbModule* m, uint8_t wave, WbInstrument* out) {
-    uint8_t b[INSTRUMENT_BYTES];
-    if (!read_record(m, m->addr[WbRole_Instr] + wave, b, INSTRUMENT_BYTES)) {
+    uint8_t b[WB_INSTRUMENT_BYTES];
+    if (!read_record(m, m->addr[WbRole_Instr] + wave, b, WB_INSTRUMENT_BYTES)) {
         return false;
     }
     *out = (WbInstrument) { .sample = b[0],

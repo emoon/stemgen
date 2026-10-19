@@ -103,6 +103,22 @@ typedef struct NuadeMetadataSink {
     void (*add_instrument)(void* ctx, uint32_t index, const char* name);
 } NuadeMetadataSink;
 
+// Sample export: the PCM sounds a song holds, for a host that writes them to disk.
+//
+// A song may hold entries that are not PCM: a synth instrument, a waveform made at runtime. sample_count counts every
+// entry of the format (so the host can say how many were left out), sample_get gives false for one that has no PCM
+// to export. A player whose sounds are all generated leaves both hooks 0.
+typedef struct NuadeExportSample {
+    uint32_t index;       // the number the format gives the sound, as NuadeVoiceInfo.instrument / nuade_instrument_name
+    const char* name;     // 0 if none; valid until nuade_close
+    const void* data;     // mono PCM, `frames` frames of `bits` bits (int8_t, or int16_t in native byte order)
+    uint32_t frames;      // not 0
+    uint8_t bits;         // 8 or 16
+    uint32_t rate;        // Hz the sound plays at when the song plays it at its base note; 0 = not known
+    uint32_t loop_start;  // in frames
+    uint32_t loop_frames; // 0 = the sound does not loop
+} NuadeExportSample;
+
 typedef struct NuadePlayer {
     uint64_t api_version; // NUADE_PLAYER_API_VERSION
     const char* id;       // short, stable: "sonix"
@@ -170,6 +186,10 @@ typedef struct NuadePlayer {
     // Test harness, optional: write the player's per-tick state to `path` ("-" = stderr, "" = off), for A/B against
     // the original. False if the file cannot be opened.
     bool (*dump_state)(void* user_data, const char* path);
+
+    // Sample export, optional (see NuadeExportSample). Both or neither. Data pointed to by `out` stays valid until close.
+    uint32_t (*sample_count)(void* user_data);
+    bool (*sample_get)(void* user_data, uint32_t n, NuadeExportSample* out);
 } NuadePlayer;
 
 #ifdef __cplusplus

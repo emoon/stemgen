@@ -189,6 +189,11 @@ LmeTickResult lme_tick(LmePlayer* player, NuadeVoices* voices);
 // Ticks per step of the voices' common grid: the greatest common divisor of the durations the song uses.
 uint32_t lme_grid_ticks(const LmePlayer* player);
 
+// The PCM of a sample instrument (record `index`); false for a synth wave or an empty record. The loop is given
+// only when it lies inside the sample.
+bool lme_instrument_pcm(const LmeModule* module, uint32_t index, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
+
 LmeVoiceState lme_voice_state(const LmePlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

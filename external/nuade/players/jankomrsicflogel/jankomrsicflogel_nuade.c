@@ -91,6 +91,24 @@ static uint32_t jankomrsicflogel_grid_ticks(void* user_data, uint32_t subsong) {
     return jmf_grid_ticks((const JmfPlayer*)user_data);
 }
 
+// The two waveforms, numbered 1 and 2 as the voices report their instrument (the fourth voice's own never plays).
+#define JANKOMRSICFLOGEL_WAVEFORMS 2
+
+static uint32_t jankomrsicflogel_sample_count(void* user_data) {
+    (void)user_data;
+    return JANKOMRSICFLOGEL_WAVEFORMS;
+}
+
+static bool jankomrsicflogel_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames;
+    if (!jmf_waveform_pcm((const JmfPlayer*)user_data, n + 1, &data, &frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n + 1, .data = data, .frames = frames, .bits = 8, .loop_frames = frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_jankomrsicflogel = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "jankomrsicflogel",
@@ -105,6 +123,8 @@ const NuadePlayer nuade_player_jankomrsicflogel = {
     .metadata = jankomrsicflogel_metadata,
     .voice_info = jankomrsicflogel_voice_info,
     .grid_ticks = jankomrsicflogel_grid_ticks,
+    .sample_count = jankomrsicflogel_sample_count,
+    .sample_get = jankomrsicflogel_sample_get,
 };
 
 JmfPlayer* jmf_from_nuade(NuadeSong* song) {

@@ -321,3 +321,23 @@ Mk2VoiceState mk2_voice_state(const Mk2Player* player, uint32_t voice) {
     const Mk2Voice* v = &player->voices[voice];
     return (Mk2VoiceState) { .period = v->paula.period, .instrument = v->instrument };
 }
+
+uint32_t mk2_instrument_count(const Mk2Player* player) {
+    const Mk2Layout* layout = player->module.layout;
+    return (layout->periods - layout->instruments) / MK2_INSTRUMENT_BYTES;
+}
+
+bool mk2_instrument_pcm(const Mk2Player* player, uint32_t n, const int8_t** data, uint32_t* length) {
+    Mk2Instrument instrument;
+    if (n >= mk2_instrument_count(player) || !mk2_instrument(&player->module, n, &instrument)) {
+        return false;
+    }
+    const uint64_t start = (uint64_t)(player->song.sample_start + instrument.offset) & ~1ull;
+    const uint64_t bytes = 2u * (uint64_t)instrument.length_words;
+    if (bytes <= 2 || start + bytes > player->module.size) { // one word is the empty sound
+        return false;
+    }
+    *data = (const int8_t*)player->chip + start;
+    *length = (uint32_t)bytes;
+    return true;
+}

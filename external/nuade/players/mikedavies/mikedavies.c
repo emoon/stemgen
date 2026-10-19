@@ -468,6 +468,33 @@ uint32_t md_subsong_count(const MdPlayer* player) {
     return player->module.subsong_count;
 }
 
+uint32_t md_instrument_count(const MdPlayer* player) {
+    const MdModule* module = &player->module;
+    return (module->instruments_limit - module->instruments + MD_INSTRUMENT_BYTES - 1) / MD_INSTRUMENT_BYTES;
+}
+
+bool md_instrument_pcm(const MdPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    const MdModule* module = &player->module;
+    MdInstrument instrument;
+    uint32_t offset = 0;
+    if (index >= md_instrument_count(player) || !md_read_instrument(module, index, &instrument)
+        || !md_offset(module, instrument.sample, &offset)) {
+        return false;
+    }
+    offset &= ~1u; // Paula ignores bit 0 of the address
+    const uint32_t bytes = 2u * instrument.length_words;
+    if (bytes == 0 || bytes > module->size - offset) {
+        return false;
+    }
+    *data = (const int8_t*)player->chip + offset;
+    *length = bytes;
+    const bool loops = instrument.loop_offset > 0 && (uint32_t)instrument.loop_offset + 2u < bytes;
+    *loop_start = loops ? (uint32_t)instrument.loop_offset : 0;
+    *loop_length = loops ? bytes - (uint32_t)instrument.loop_offset : 0;
+    return true;
+}
+
 MdVoiceState md_voice_state(const MdPlayer* player, uint32_t voice) {
     if (voice >= MD_VOICES) {
         return (MdVoiceState) { .period = 0, .instrument = MD_NO_INSTRUMENT };

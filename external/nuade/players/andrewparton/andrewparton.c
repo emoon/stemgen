@@ -418,6 +418,29 @@ ApTickResult ap_tick(ApPlayer* player, NuadeVoices* voices) {
     return (ApTickResult) { .ended = ended };
 }
 
+bool ap_instrument_pcm(const ApPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    const ApModule* m = &player->module;
+    if (inst < 0 || inst >= AP_INSTRUMENT_COUNT) {
+        return false;
+    }
+    const ApInstrument* in = &m->instruments[inst];
+    // the loader has checked that the sample lies inside the module; the player plays whole words of it
+    const uint32_t frames = in->length & ~1u;
+    if (!in->has_sample || frames == 0) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + in->sample;
+    *length = frames;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (in->loop_length > 1 && in->loop_start < frames) {
+        *loop_start = in->loop_start;
+        *loop_length = in->loop_length < frames - in->loop_start ? in->loop_length : frames - in->loop_start;
+    }
+    return true;
+}
+
 ApVoiceState ap_voice_state(const ApPlayer* player, int voice) {
     const ApVoice* v = &player->voices[voice];
     return (ApVoiceState) { .note = v->note, .instrument = v->instrument };

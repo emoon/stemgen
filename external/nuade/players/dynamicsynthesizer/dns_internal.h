@@ -55,6 +55,8 @@ void dns_module_free(DnsModule* module);
 uint16_t dns_read_period(const DnsModule* module, unsigned index);
 DnsSong dns_read_song(const DnsModule* module, unsigned song);
 DnsInstrument dns_read_instrument(const DnsModule* module, unsigned number);
+// The sample records that are valid for a samples file of `samples_size` bytes, counted from the first.
+unsigned dns_instrument_count(const DnsModule* module, uint32_t samples_size);
 DnsTrackRow dns_read_track_row(const DnsModule* module, unsigned track, uint16_t position);
 // The offset of the pattern with the 1-based number `pattern`.
 uint32_t dns_pattern_offset(const DnsModule* module, uint8_t pattern);

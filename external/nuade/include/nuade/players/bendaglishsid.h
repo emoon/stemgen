@@ -218,6 +218,14 @@ BdsTickResult bds_tick(BdsPlayer* player, NuadeVoices* voices);
 BdsInfo bds_info(const BdsPlayer* player);
 BdsVoiceState bds_voice_state(const BdsPlayer* player, int voice);
 
+// The instrument records of the driver (a song numbers its instruments from 0 and, as long as it keeps the default
+// instrument map, an instrument is the record of its number), and the PCM of one in bytes: the sample of a sample
+// instrument, which plays once, or octave 0 of the wave form the instrument selects, which loops as a whole. False for
+// an instrument with neither.
+int bds_sample_count(const BdsPlayer* player);
+bool bds_sample_pcm(const BdsPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 BdsPlayer* bds_from_nuade(NuadeSong* song);
 

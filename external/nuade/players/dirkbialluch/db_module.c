@@ -223,6 +223,7 @@ bool db_module_locate(DbModule* m) {
     const uint32_t program_count_offset = programs_tag + TAG_BYTES;
     m->program_table = program_count_offset + 2;
     m->program_data = table_data_offset(m->program_table, song_u16(m, program_count_offset), 2);
+    m->program_count = (uint32_t)song_u16(m, program_count_offset) + TABLE_EXTRA_ENTRIES;
     m->groove = groove_tag + TAG_BYTES;
     m->arpeggio = arpeggio_tag + TAG_BYTES;
     return true;
@@ -274,6 +275,7 @@ static DbStatus load_samples(DbModule* m, const char* path, const NuadeIo* io) {
                     m->sample_table = TAG_BYTES + SAMPLE_COUNT_BYTES;
                     m->sample_data
                         = table_data_offset(m->sample_table, nuade_read_be16(file.data + TAG_BYTES), sizeof(uint32_t));
+                    m->sample_count = (uint32_t)nuade_read_be16(file.data + TAG_BYTES) + TABLE_EXTRA_ENTRIES;
                     status = DbStatus_Ok;
                 }
             }
@@ -367,4 +369,58 @@ const int8_t* db_sample_lc(const DbModule* m, uint32_t address) {
         return nullptr;
     }
     return (const int8_t*)(m->samples + (address - DB_SAMPLE_FILE_ADDRESS));
+}
+
+// The commands of a program are read up to its end: the position is a byte, so there are 64 of them.
+#define PROGRAM_MAX_COMMANDS 64
+
+bool db_module_program_pcm(const DbModule* m, uint8_t program, const int8_t** data, uint32_t* length) {
+    if (program >= m->program_count || m->samples == nullptr) {
+        return false;
+    }
+    const uint32_t address = db_program_address(m, program);
+    bool has_sample = false;
+    bool has_length = false;
+    uint32_t start = 0;
+    uint32_t bytes = 0;
+    for (uint16_t i = 0; i < PROGRAM_MAX_COMMANDS && !has_length; i++) {
+        const DbProgramCommand c = db_program_command(m, address, (uint16_t)(i * 4));
+        const DbProgramOp op = db_program_op(c.code);
+        const uint16_t word = (uint16_t)((c.second << 8) | c.third);
+        if (op == DbProgramOp_End || op == DbProgramOp_Idle || op == DbProgramOp_RequestProgram) {
+            break;
+        }
+        if (op == DbProgramOp_StartSample || op == DbProgramOp_SetSample) {
+            has_sample = c.third < m->sample_count;
+            start = db_sample_address(m, c.third) - DB_SAMPLE_FILE_ADDRESS;
+        } else if (op == DbProgramOp_SampleAdd) {
+            start += word;
+        } else if (op == DbProgramOp_SampleSub) {
+            start -= word;
+        } else if (op == DbProgramOp_SetLength) {
+            // a program may start a sample with length 0 before the one it plays
+            bytes = ((uint32_t)c.first << 16) | ((uint32_t)c.second << 8) | c.third;
+            has_length = has_sample && bytes != 0;
+        }
+    }
+    if (!has_sample || start >= m->samples_size) {
+        return false;
+    }
+    if (!has_length) {
+        // up to the next sample of the table
+        bytes = m->samples_size - start;
+        for (uint32_t n = 0; n < m->sample_count; n++) {
+            const uint32_t other = db_sample_address(m, (uint8_t)n) - DB_SAMPLE_FILE_ADDRESS;
+            if (other > start && other - start < bytes) {
+                bytes = other - start;
+            }
+        }
+    }
+    bytes = bytes < m->samples_size - start ? bytes : m->samples_size - start;
+    if (bytes == 0) {
+        return false;
+    }
+    *data = (const int8_t*)(m->samples + start);
+    *length = bytes;
+    return true;
 }

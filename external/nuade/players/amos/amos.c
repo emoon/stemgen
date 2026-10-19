@@ -1188,6 +1188,43 @@ const char* amos_sample_name(const AmosPlayer* p, int sample) {
     return sample >= 0 && sample < AMOS_SAMPLES ? p->module.samples[sample].name : "";
 }
 
+int amos_sample_count(const AmosPlayer* p) {
+    return p->module.sample_count;
+}
+
+bool amos_sample_pcm(const AmosPlayer* p, int sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                     uint32_t* loop_length) {
+    const AmosModule* m = &p->module;
+    if (sample < 0 || sample >= m->sample_count) {
+        return false;
+    }
+    const AmosSample* s = &m->samples[sample];
+    const size_t at = m->samples_offset + s->offset;
+    if (s->length == 0 || at >= m->bank.size) {
+        return false;
+    }
+    // the bank may end inside the last sample
+    uint32_t frames = (uint32_t)s->length * 2;
+    if (frames > m->bank.size - at) {
+        frames = (uint32_t)(m->bank.size - at);
+    }
+    *data = (const int8_t*)(m->bank.data + at);
+    *length = frames;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (s->loop_length > 1) {
+        // InitSound halves a loop start that lies beyond the sample
+        const uint32_t start
+            = (uint16_t)(s->loop_start + s->loop_length) > s->length ? s->loop_start >> 1 : s->loop_start;
+        if (start * 2 < frames) {
+            *loop_start = start * 2;
+            *loop_length = (uint32_t)s->loop_length * 2 < frames - *loop_start ? (uint32_t)s->loop_length * 2
+                                                                               : frames - *loop_start;
+        }
+    }
+    return true;
+}
+
 AmosPosition amos_position(const AmosPlayer* p) {
     const AmosSong* s = &p->song;
     return (AmosPosition) { .order = s->shown_order, .row = s->shown_row, .speed = (int)s->speed };

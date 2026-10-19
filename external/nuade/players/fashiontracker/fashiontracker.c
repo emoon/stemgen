@@ -323,3 +323,22 @@ FtCell ft_pattern_cell(const FtPlayer* player, int order, int voice, int row) {
     const uint32_t pattern = module_u8(m, m->order_list + (uint32_t)order);
     return cell_at(m, pattern, (uint32_t)voice, (uint32_t)row);
 }
+
+bool ft_instrument_pcm(const FtPlayer* player, int slot, const int8_t** data, uint32_t* bytes, bool* loops) {
+    if (player == nullptr || slot < 0 || slot >= FT_INSTRUMENTS) {
+        return false;
+    }
+    const FtModule* m = &player->module;
+    const uint32_t entry = m->instruments + (uint32_t)slot * 4;
+    const uint32_t sample = (uint32_t)module_u16(m, entry) * 4;
+    const uint32_t start = table_offset(m, module_u32(m, m->sample_starts + sample));
+    const uint32_t length = (uint32_t)module_u16(m, m->sample_lengths + sample + 2) * 2;
+    if (length == 0 || start >= m->size) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + start;
+    // what lies beyond the end of the file is silence
+    *bytes = length < m->size - start ? length : m->size - start;
+    *loops = module_u8(m, m->sample_loop_flags + sample + 3) == 1;
+    return true;
+}

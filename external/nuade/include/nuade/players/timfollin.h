@@ -17,6 +17,8 @@ extern "C" {
 #endif
 
 #define TFOL_VOICES 4
+// An instrument is named by a byte of the stream.
+#define TFOL_INSTRUMENTS 256
 
 // The eagleplayer's file name prefix (the files are also named with it as a suffix).
 #define TFOL_EXTENSION "tf"
@@ -63,6 +65,8 @@ typedef struct TfolModule {
     uint32_t table;         // file offset of the song table
     uint32_t address_delta; // original address + address_delta = file offset (32-bit wrap, like adda.l)
     uint32_t subsong_count;
+    bool instrument_known[TFOL_INSTRUMENTS]; // the instruments the first subsong's streams name, from the open-time
+                                             // proof
 } TfolModule;
 
 typedef struct TfolSong {
@@ -160,6 +164,13 @@ bool tfol_start(TfolPlayer* player, uint32_t subsong, NuadeVoices* voices);
 
 TfolTickResult tfol_tick(TfolPlayer* player, NuadeVoices* voices);
 TfolVoiceState tfol_voice_state(const TfolPlayer* player, uint32_t voice);
+
+// The sounds of the first subsong (the instruments its streams name; the modules of the format share one instrument
+// table between the songs): `index` is the instrument number the streams use, as TfolVoiceState.instrument.
+// False for one the song does not use.
+// The number of the last instrument the first subsong names, plus one.
+uint32_t tfol_instrument_count(const TfolPlayer* player);
+bool tfol_instrument_pcm(const TfolPlayer* player, uint32_t index, const int8_t** data, uint32_t* length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 TfolPlayer* tfol_from_nuade(NuadeSong* song);

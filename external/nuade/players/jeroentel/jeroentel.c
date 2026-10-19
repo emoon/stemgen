@@ -406,6 +406,54 @@ JtTickResult jt_tick(JtPlayer* player, NuadeVoices* voices) {
     return (JtTickResult) { .looped = player->looped, .ended = !player->playing };
 }
 
+// The instrument table has no count: it runs to the first address that is not in the module, or to the first record
+// that lies behind the table.
+uint32_t jt_instrument_count(const JtPlayer* player) {
+    const JtModule* m = &player->module;
+    uint32_t limit = m->size;
+    uint32_t n = 0;
+    while (m->instrument_table + 4 * (n + 1) <= limit) {
+        const uint32_t record = jt_table_entry(m, m->instrument_table, 4 * n);
+        if (record == JT_NO_OFFSET) {
+            break;
+        }
+        if (record > m->instrument_table && record < limit) {
+            limit = record;
+        }
+        n++;
+    }
+    return n;
+}
+
+bool jt_instrument_pcm(const JtPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                       uint32_t* loop_frames) {
+    const JtModule* m = &player->module;
+    if (n >= jt_instrument_count(player)) {
+        return false;
+    }
+    const JtInstrument ins = jt_read_instrument(m, jt_table_entry(m, m->instrument_table, 4 * n));
+    const uint32_t sample = jt_offset_of(m, ins.sample);
+    const uint32_t start = sample & ~1u;
+    const uint64_t length = (uint64_t)ins.length_words * 2;
+    if (sample == JT_NO_OFFSET || length == 0 || (uint64_t)start + length > m->size) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + start;
+    *frames = (uint32_t)length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The repeat is a run of its own (a loop address of 0 repeats nothing); it is shown as a loop where it lies inside
+    // the sample.
+    const uint32_t loop = ins.loop != 0 ? jt_offset_of(m, ins.loop) : JT_NO_OFFSET;
+    const uint64_t loop_length = (uint64_t)ins.loop_length_words * 2;
+    if (ins.loop_length_words > 1 && loop != JT_NO_OFFSET && (loop & ~1u) >= start
+        && (uint64_t)(loop & ~1u) + loop_length <= (uint64_t)start + length) {
+        *loop_start = (loop & ~1u) - start;
+        *loop_frames = (uint32_t)loop_length;
+    }
+    return true;
+}
+
 JtVoiceState jt_voice_state(const JtPlayer* player, int voice) {
     if (voice < 0 || voice >= JT_VOICES) {
         return (JtVoiceState) { .note = -1, .instrument = -1 };

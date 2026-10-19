@@ -78,6 +78,22 @@ static uint32_t quartet_grid_ticks(void* user_data, uint32_t subsong) {
     return qt_tempo((const QtPlayer*)user_data);
 }
 
+static uint32_t quartet_sample_count(void* user_data) {
+    (void)user_data;
+    return QT_SAMPLES;
+}
+
+static bool quartet_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    QtSamplePcm pcm;
+    if (!qt_sample_pcm((const QtPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = pcm.data, .frames = pcm.frames, .bits = 8, .loop_frames = pcm.loops ? pcm.frames : 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_quartet = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "quartet",
@@ -92,6 +108,8 @@ const NuadePlayer nuade_player_quartet = {
     .metadata = quartet_metadata,
     .voice_info = quartet_voice_info,
     .grid_ticks = quartet_grid_ticks,
+    .sample_count = quartet_sample_count,
+    .sample_get = quartet_sample_get,
 };
 
 QtPlayer* qt_from_nuade(NuadeSong* song) {

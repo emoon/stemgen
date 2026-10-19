@@ -41,6 +41,16 @@ typedef struct RhInstrument {
     uint16_t ferris_min;
 } RhInstrument;
 
+// The sound of sample / instrument `index` as the file holds it (the ferris wheel rewrites the module's copy while it
+// plays). False for an empty sample.
+typedef struct RhSamplePcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = the repeat is silence
+} RhSamplePcm;
+bool rh_module_sample_pcm(const RhModule* module, uint32_t index, RhSamplePcm* out);
+
 // The offset of instrument record `index`.
 uint32_t rh_module_instrument(const RhModule* module, uint32_t index);
 

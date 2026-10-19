@@ -1796,3 +1796,30 @@ AvpVoiceState avp_voice_state(const AvpModule* module, int voice) {
     const AvpChannel* c = &module->channels[voice];
     return (AvpVoiceState) { .period = c->started_period, .instrument = c->started_instrument };
 }
+
+int avp_sample_count(const AvpModule* module) {
+    return module ? module->num_instruments : 0;
+}
+
+bool avp_sample_pcm(const AvpModule* module, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length) {
+    if (!module || instrument < 0 || instrument >= module->num_instruments)
+        return false;
+    const AvpSample* sample = avp_sample_for(module, module->instruments[instrument].sample_number);
+    if (sample->sample_data == nullptr)
+        return false;
+    // the player plays length words of the data and never reads past what the file holds
+    uint32_t frames = sample->length * 2U;
+    if (frames > sample->data_size)
+        frames = sample->data_size;
+    if (frames == 0)
+        return false;
+    *data = sample->sample_data;
+    *length = frames;
+    const bool loops = sample->loop_length > 1 && sample->loop_start < frames;
+    *loop_start = loops ? sample->loop_start : 0;
+    *loop_length = loops ? sample->loop_length * 2U : 0;
+    if (*loop_start + *loop_length > frames)
+        *loop_length = frames - *loop_start;
+    return true;
+}

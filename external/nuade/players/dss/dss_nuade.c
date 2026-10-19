@@ -121,6 +121,28 @@ static uint32_t dss_nuade_tracker_cells(void* user_data, const NuadePosition* at
                               user_data);
 }
 
+static uint32_t dss_nuade_sample_count(void* user_data) {
+    return (uint32_t)dss_get_instrument_count((const DssModule*)user_data);
+}
+
+static bool dss_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const DssModule* module = (const DssModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dss_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = dss_get_instrument_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_dss = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "dss",
@@ -137,6 +159,8 @@ const NuadePlayer nuade_player_dss = {
     .voice_info = dss_nuade_voice_info,
     .tracker_info = dss_nuade_tracker_info,
     .tracker_cells = dss_nuade_tracker_cells,
+    .sample_count = dss_nuade_sample_count,
+    .sample_get = dss_nuade_sample_get,
 };
 
 DssModule* dss_from_nuade(NuadeSong* song) {

@@ -59,6 +59,15 @@ static bool sp_long_instrument(const SpMemory* set, unsigned index, SpLongInstru
     return index < SP_INSTRUMENTS && sp_memory_has(set, offset, SP_LONG_HEADER_SIZE);
 }
 
+bool sp_long_instrument_wave(const SpMemory* set, unsigned index, SpWave* wave) {
+    SpLongInstrument instrument;
+    if (!sp_long_instrument(set, index, &instrument)) {
+        return false;
+    }
+    *wave = instrument.wave;
+    return true;
+}
+
 static SpLongEvent sp_long_event(const SpMemory* song, uint32_t at) {
     return (SpLongEvent) { .note = sp_u8(song, at),
                            .volume = sp_u8(song, at + 1),

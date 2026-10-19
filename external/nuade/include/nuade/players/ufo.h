@@ -152,6 +152,11 @@ bool ufo_start(UfoPlayer* player, NuadeVoices* voices);
 UfoTickResult ufo_tick(UfoPlayer* player, NuadeVoices* voices);
 UfoVoiceState ufo_voice_state(const UfoPlayer* player, int voice);
 
+// The PCM of instrument `index` (0-based, as UfoVoiceState.instrument): a sample of the song or of the sample bank, as
+// the replayer hands it to Paula. Lengths and loop in bytes. False for an instrument without a sample.
+bool ufo_instrument_pcm(const UfoPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 UfoPlayer* ufo_from_nuade(NuadeSong* song);
 

@@ -81,6 +81,29 @@ static void musicassembler_metadata(void* user_data, const NuadeMetadataSink* si
     }
 }
 
+static uint32_t musicassembler_sample_count(void* user_data) {
+    return (uint32_t)ma_instrument_count((const MaModule*)user_data);
+}
+
+// One entry per instrument, the numbers voice_info reports; instruments that share a sample give it again.
+static bool musicassembler_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const MaModule* module = (const MaModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!ma_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const int sample = (int)ma_instrument_get_param(module, (int)n, "sampleNumber");
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = ma_sample_name(module, sample),
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_musicassembler = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "musicassembler",
@@ -95,6 +118,8 @@ const NuadePlayer nuade_player_musicassembler = {
     .metadata = musicassembler_metadata,
     .voice_info = musicassembler_voice_info,
     .grid_ticks = musicassembler_grid_ticks,
+    .sample_count = musicassembler_sample_count,
+    .sample_get = musicassembler_sample_get,
 };
 
 MaModule* ma_from_nuade(NuadeSong* song) {

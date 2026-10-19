@@ -184,6 +184,11 @@ JpTickResult jp_tick(JpPlayer* player, NuadeVoices* voices);
 
 // Ticks one sequencer step spans for a subsong (0-based); 0 for a bad subsong.
 uint32_t jp_grid_ticks(const JpPlayer* player, int subsong);
+// The samples the module declares, and the PCM of one as loaded (`n` is the number the instrument scripts select a
+// sample by; an instrument is a script, which can use several samples and sets the loop itself). False for a sample
+// outside the image.
+uint32_t jp_sample_count(const JpPlayer* player);
+bool jp_sample_pcm(const JpPlayer* player, uint32_t n, const int8_t** data, uint32_t* length);
 JpVoiceState jp_voice_state(const JpPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

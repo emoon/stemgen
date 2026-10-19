@@ -1456,6 +1456,21 @@ const char* sm_get_instrument_name(const SmModule* module, int inst) {
     return "";
 }
 
+bool sm_instrument_pcm(const SmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= 15 || module->instruments[inst].is_synth)
+        return false;
+    const SmSampleInstrument* si = &module->instruments[inst].sample;
+    if (si->adr == NULL || si->length == 0)
+        return false;
+    *data = si->adr;
+    *length = si->length;
+    // a loop of 2 bytes is the "no loop" the player writes
+    *loop_start = si->loop_length > 2 ? si->loop_start : 0;
+    *loop_length = si->loop_length > 2 ? si->loop_length : 0;
+    return true;
+}
+
 float sm_get_instrument_param(const SmModule* module, int inst, const char* param) {
     if (!module || inst < 0 || inst >= 15 || !param)
         return -1.0f;

@@ -82,3 +82,39 @@ CdVoiceState cd_voice_state(const CdPlayer* player, int voice) {
     const CdVoice* v = &player->voices[voice];
     return (CdVoiceState) { .note = v->display_note, .instrument = v->display_instrument };
 }
+
+int cd_instrument_count(const CdPlayer* player) {
+    const CdHeader* h = &player->module.header;
+    return h->instruments_end > h->instruments ? (int)((h->instruments_end - h->instruments) / CD_INSTRUMENT_SIZE) : 0;
+}
+
+bool cd_instrument_pcm(const CdPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    if (inst < 0 || inst >= cd_instrument_count(player)) {
+        return false;
+    }
+    const CdModule* module = &player->module;
+    const CdMemory* m = &module->memory;
+    const CdInstrument instrument
+        = cd_read_instrument(m, module->header.instruments + (uint32_t)inst * CD_INSTRUMENT_SIZE);
+    const uint32_t start = instrument.sample + 2;
+    const uint32_t size = (uint32_t)cd_u16(m, instrument.sample) * 2;
+    if (instrument.sample == 0 || size == 0 || start > m->size || size > m->size - start) {
+        return false;
+    }
+    *data = (const int8_t*)(m->data + start);
+    *length = size;
+    *loop_start = 0;
+    *loop_length = 0;
+    const bool loops = module->version.attack_flag ? instrument.has_attack : !instrument.one_shot;
+    const uint32_t loop = (uint32_t)(int32_t)instrument.loop_offset;
+    const uint32_t loop_size = (uint32_t)instrument.loop_words * 2;
+    if (loops && loop_size > 2 && loop < size && loop_size <= size - loop) {
+        *loop_start = loop;
+        *loop_length = loop_size;
+    } else if (!instrument.one_shot) {
+        // nothing sets another block: Paula repeats the sample (the waveform of a synthetic sound)
+        *loop_length = size;
+    }
+    return true;
+}

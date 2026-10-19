@@ -171,6 +171,10 @@ StkTickResult stk_tick(StkPlayer* player, NuadeVoices* voices);
 
 // 0-based; the 32 byte name field of the instrument (the first ones usually hold the song's text), "" when empty.
 const char* stk_instrument_name(const StkPlayer* player, int instrument);
+// The PCM of instrument `inst` (0-based, STK_INSTRUMENTS in all; 8 bit): the sample, or the wave a synth instrument
+// starts from (one looped cycle). False for an empty instrument.
+bool stk_instrument_pcm(const StkPlayer* player, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                        uint32_t* loop_frames);
 
 // The row decoded by the last row tick (position 0, row 0 before the first one).
 StkPosition stk_position(const StkPlayer* player);

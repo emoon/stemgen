@@ -10,8 +10,6 @@
 #include "mon_internal.h"
 
 #define ENVELOPE_HOLD 0x81 // an envelope byte: stay while the note is held, else go on behind it
-#define WAVE_SPEED 0xFE    // a wave list byte: set the speed from the byte that follows
-#define WAVE_JUMP 0xFF     // a wave list byte: jump back by the byte that follows
 
 // A length byte in ticks: the tempo times the byte, less the swing the voice owes.
 
@@ -189,11 +187,11 @@ static void run_waves(MonPlayer* p, int voice, const MonInstrument* ins) {
         uint8_t pos = (uint8_t)v->wave_pos;
         for (int guard = 0; guard < MON_LIST_GUARD; guard++) {
             const uint8_t byte = mon_u8(m, list + pos);
-            if (byte == WAVE_SPEED) {
+            if (byte == MON_NEW_WAVE_SPEED) {
                 v->wave_speed = mon_u8(m, list + pos + 1u);
                 v->wave_timer = v->wave_speed;
                 pos = (uint8_t)(pos + 2);
-            } else if (byte == WAVE_JUMP) {
+            } else if (byte == MON_NEW_WAVE_JUMP) {
                 pos = (uint8_t)(pos - mon_u8(m, list + pos + 1u));
             } else {
                 const MonWave wave = mon_read_wave(m, byte);

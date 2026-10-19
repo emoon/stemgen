@@ -63,6 +63,22 @@ static uint32_t hippelhip_grid_ticks(void* user_data, uint32_t subsong) {
     return (uint32_t)hh_speed((const HhPlayer*)user_data);
 }
 
+static uint32_t hippelhip_sample_count(void* user_data) {
+    return hh_sample_count((const HhPlayer*)user_data);
+}
+
+static bool hippelhip_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!hh_sample_pcm((const HhPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_hippelhip = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "hippelhip",
@@ -77,6 +93,8 @@ const NuadePlayer nuade_player_hippelhip = {
     .metadata = hippelhip_metadata,
     .voice_info = hippelhip_voice_info,
     .grid_ticks = hippelhip_grid_ticks,
+    .sample_count = hippelhip_sample_count,
+    .sample_get = hippelhip_sample_get,
 };
 
 HhPlayer* hh_from_nuade(NuadeSong* song) {

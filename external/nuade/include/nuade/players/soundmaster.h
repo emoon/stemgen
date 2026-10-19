@@ -233,6 +233,12 @@ int smst_ticks_per_row(const SmstPlayer* player);
 
 SmstVoiceState smst_voice_state(const SmstPlayer* player, int voice);
 
+// Instrument records the module has room for and the PCM of one: the sample its notes start with, as the module
+// holds it, with the loop. False for an unused instrument or one without sample data.
+int smst_instrument_count(const SmstPlayer* player);
+bool smst_instrument_pcm(const SmstPlayer* player, int number, const int8_t** data, uint32_t* length,
+                         uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SmstPlayer* smst_from_nuade(NuadeSong* song);
 

@@ -488,6 +488,41 @@ ThmTickResult thm_tick(ThmPlayer* p, NuadeVoices* voices) {
     return result;
 }
 
+uint32_t thm_instrument_count(const ThmPlayer* player) {
+    return (uint32_t)thm_module_instrument_count(player->module) + 1; // number 0 is the empty record
+}
+
+bool thm_instrument_pcm(const ThmPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames) {
+    const ThmModule* module = player->module;
+    if (number == 0 || number >= thm_instrument_count(player)) {
+        return false;
+    }
+    const ThmInstrument instrument = thm_module_instrument(module, (uint8_t)number);
+    const uint64_t start = instrument.sample;
+    uint64_t end = start + (uint64_t)(instrument.length & ~1u);
+    if (end == start || end > module->chip_size) {
+        return false;
+    }
+    *loop_start = 0;
+    *loop_frames = 0;
+    // A flags byte of 0 plays the block twice and stops; any other value repeats the loop part.
+    const uint32_t loop_bytes = instrument.loop_bytes & ~1u;
+    if (instrument.flags != 0 && loop_bytes > 2) {
+        const uint64_t loop_end = start + instrument.loop_offset + loop_bytes;
+        if (loop_end <= module->chip_size) {
+            *loop_start = instrument.loop_offset;
+            *loop_frames = loop_bytes;
+            if (loop_end > end) {
+                end = loop_end;
+            }
+        }
+    }
+    *data = thm_module_chip(module, start);
+    *frames = (uint32_t)(end - start);
+    return true;
+}
+
 ThmVoiceState thm_voice_state(const ThmPlayer* player, uint32_t voice) {
     const ThmChannel* c = &player->channel[voice % THM_VOICES];
     return (ThmVoiceState) { .period = c->note_period, .instrument = c->instrument };

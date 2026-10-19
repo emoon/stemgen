@@ -118,6 +118,20 @@ static uint32_t gluemon_tracker_cells(void* user_data, const NuadePosition* at, 
                               user_data);
 }
 
+static uint32_t gluemon_sample_count(void* user_data) {
+    return gm_sound_count((const GmPlayer*)user_data);
+}
+
+static bool gluemon_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t bytes;
+    if (!gm_sound_pcm((const GmPlayer*)user_data, n, &data, &bytes)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = bytes, .bits = 8, .loop_frames = bytes };
+    return true;
+}
+
 const NuadePlayer nuade_player_gluemon = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "gluemon",
@@ -134,6 +148,8 @@ const NuadePlayer nuade_player_gluemon = {
     .voice_info = gluemon_voice_info,
     .tracker_info = gluemon_tracker_info,
     .tracker_cells = gluemon_tracker_cells,
+    .sample_count = gluemon_sample_count,
+    .sample_get = gluemon_sample_get,
 };
 
 GmPlayer* gm_from_nuade(NuadeSong* song) {

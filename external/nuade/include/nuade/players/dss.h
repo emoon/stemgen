@@ -235,6 +235,10 @@ void dss_set_cell(DssModule* module, int pattern, int row, int channel, uint8_t 
                   uint8_t effect_arg);
 
 const char* dss_get_instrument_name(const DssModule* module, int inst);
+// The sound of sample 0..30: the first part followed by the loop part that the player plays after it (`loop_length`
+// 0: none). False for an empty sample.
+bool dss_instrument_pcm(const DssModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
 float dss_get_instrument_param(const DssModule* module, int inst, const char* param);
 void dss_set_instrument_param(DssModule* module, int inst, const char* param, float value);
 

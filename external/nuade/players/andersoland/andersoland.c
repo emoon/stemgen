@@ -713,6 +713,71 @@ AoTickResult ao_tick(AoPlayer* player, NuadeVoices* voices) {
     return (AoTickResult) { .looped = s->looped, .ended = s->ended };
 }
 
+// The sample numbers the sample tables hold.
+static int sample_table_count(const AoModule* m) {
+    return (uint16_t)(m->sample_lengths - m->sample_starts) / BYTES_PER_LONG;
+}
+
+// The instrument table runs up to the envelope table that follows it.
+int ao_sample_count(const AoPlayer* player) {
+    const AoModule* m = &player->module;
+    return m->envelopes > m->instruments ? (int)((m->envelopes - m->instruments) / INSTRUMENT_SIZE) : 0;
+}
+
+bool ao_sample_pcm(const AoPlayer* player, int instrument, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    const AoModule* m = &player->module;
+    if (instrument < 0 || instrument >= ao_sample_count(player)) {
+        return false;
+    }
+    // the sample the instrument's events start; the alternate flag picks the second one
+    const int sample = instrument_at(m, (uint8_t)instrument).sample[0];
+    if (sample >= sample_table_count(m)) {
+        return false;
+    }
+    const SampleRef attack = attack_part(m, (uint8_t)sample);
+    const SampleRef loop = loop_part(m, (uint8_t)sample);
+    // the module holds the samples as the file has them, a run never goes past it
+    const uint64_t attack_at = sample_start(m, attack.start);
+    const uint64_t loop_at = sample_start(m, loop.start);
+    uint64_t attack_end = attack_at + 2u * attack.length_words;
+    if (attack_end > m->size) {
+        attack_end = m->size;
+    }
+    uint64_t loop_end = loop_at + 2u * loop.length_words;
+    if (loop_end > m->size) {
+        loop_end = m->size;
+    }
+    const bool has_attack = attack.length_words != 0 && attack_at < attack_end;
+    // a loop of one word is the "no loop" the replayer writes
+    const bool has_loop = loop.length_words > 1 && loop_at < loop_end;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (!has_attack && !has_loop) {
+        return false;
+    }
+    if (!has_attack) {
+        *data = (const int8_t*)m->data + loop_at;
+        *length = (uint32_t)(loop_end - loop_at);
+        *loop_length = *length;
+        return true;
+    }
+    *data = (const int8_t*)m->data + attack_at;
+    *length = (uint32_t)(attack_end - attack_at);
+    if (!has_loop) {
+        return true;
+    }
+    // The loop is one run with the attack when it starts inside it (or right behind it) and reaches its end, which is
+    // how the samples of the format are cut; any other loop has no place in a single run.
+    if (loop_at < attack_at || loop_at > attack_end || loop_end < attack_end) {
+        return false;
+    }
+    *length = (uint32_t)(loop_end - attack_at);
+    *loop_start = (uint32_t)(loop_at - attack_at);
+    *loop_length = (uint32_t)(loop_end - loop_at);
+    return true;
+}
+
 uint32_t ao_grid_ticks(const AoPlayer* player, int subsong) {
     if (subsong < 0 || (uint32_t)subsong >= player->module.subsong_count) {
         return 0;

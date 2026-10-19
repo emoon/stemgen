@@ -5,6 +5,7 @@
 // stream position with the end of its stream (SongEnd) and starts the song again. Its volume patch scales by 64/64 and
 // all four voices are enabled, so the volume registers get the replayer's value unchanged.
 
+#include "nuade_base.h"
 #include "pr_internal.h"
 #include <string.h>
 
@@ -446,6 +447,43 @@ PrTickResult pr_tick(PrPlayer* player, NuadeVoices* voices) {
         nuade_paula_channel_sync(&player->voices[i].paula, i, voices);
     }
     return result;
+}
+
+uint32_t pr_instrument_count(const PrPlayer* player) {
+    return player->song.instrument_count;
+}
+
+bool pr_instrument_pcm(const PrPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    const PrSong* song = &player->song;
+    if (number >= song->instrument_count) {
+        return false;
+    }
+    const PrInstrument in = pr_song_instrument(song, number);
+    const int8_t* sample = pr_song_sample(song, in.sample);
+    if (sample == nullptr || in.length_words == 0) {
+        return false;
+    }
+    const uint32_t start = in.sample & ~1u; // Paula drops bit 0 of the address
+    uint32_t bytes = 2u * in.length_words;
+    const uint32_t loop_at = in.loop & ~1u;
+    const bool loops = in.loop_length_words > 1 && loop_at >= start;
+    if (loops) {
+        // the loop follows the first run in the sample file, or lies inside it
+        const uint32_t loop_end = loop_at - start + 2u * in.loop_length_words;
+        bytes = loop_end > bytes ? loop_end : bytes;
+    }
+    if (bytes > song->sample_size - start) {
+        bytes = song->sample_size - start;
+    }
+    *data = sample;
+    *length = bytes;
+    *loop_start = loops && loop_at - start < bytes ? loop_at - start : 0;
+    *loop_length = loops && loop_at - start < bytes ? bytes - *loop_start : 0;
+    if (*loop_length > 2u * in.loop_length_words) {
+        *loop_length = 2u * in.loop_length_words;
+    }
+    return true;
 }
 
 uint32_t pr_voice_count(const PrPlayer* player) {

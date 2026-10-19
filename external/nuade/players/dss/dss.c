@@ -1134,6 +1134,33 @@ const char* dss_get_instrument_name(const DssModule* module, int inst) {
     return module->samples[inst].name;
 }
 
+bool dss_instrument_pcm(const DssModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= 31)
+        return false;
+    const DssSample* s = &module->samples[inst];
+    if (s->data == nullptr || s->length == 0 || s->start_offset > s->data_size)
+        return false;
+    uint32_t size = (uint32_t)s->length * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (s->loop_length > 1) {
+        // the loop part is stored behind the first part
+        size += (uint32_t)s->loop_length * 2;
+        *loop_start = s->loop_start;
+        *loop_length = (uint32_t)s->loop_length * 2;
+    }
+    if (size > s->data_size - s->start_offset)
+        size = s->data_size - s->start_offset;
+    if (*loop_length != 0 && (*loop_start >= size || *loop_length > size - *loop_start)) {
+        *loop_start = 0;
+        *loop_length = 0;
+    }
+    *data = s->data + s->start_offset;
+    *length = size;
+    return true;
+}
+
 float dss_get_instrument_param(const DssModule* module, int inst, const char* param) {
     if (!module || inst < 0 || inst >= 31 || !param)
         return -1.0f;

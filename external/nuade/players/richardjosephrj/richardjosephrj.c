@@ -799,6 +799,51 @@ RjgTickResult rjg_tick(RjgPlayer* player, NuadeVoices* voices) {
     return result;
 }
 
+// An instrument row is a real one when it has a loop flag of -1 or 1 and its sample lies in the module; the rows behind
+// the last one are other data of the module (the table is the module's last).
+static bool instrument_valid(const RjgModule* m, const RjgInstrument* in) {
+    return (in->loops == -1 || in->loops == 1) && in->length_words != 0
+           && (uint64_t)in->sample + (uint64_t)in->length_words * 2 <= m->size;
+}
+
+int rjg_instrument_count(const RjgPlayer* player) {
+    const RjgModule* m = &player->module;
+    int count = 0;
+    while (count < RJG_MAX_INSTRUMENTS) {
+        const RjgInstrument in = rjg_instrument(m, (uint32_t)count);
+        if (!instrument_valid(m, &in)) {
+            break;
+        }
+        count++;
+    }
+    return count;
+}
+
+bool rjg_instrument_pcm(const RjgPlayer* player, int n, RjgInstrumentPcm* out) {
+    const RjgModule* m = &player->module;
+    if (n < 0 || n >= rjg_instrument_count(player)) {
+        return false;
+    }
+    const RjgInstrument in = rjg_instrument(m, (uint32_t)n);
+    const uint32_t frames = (uint32_t)in.length_words * 2;
+    const int8_t* data = (const int8_t*)m->data + (in.sample & ~1u);
+    // the unused rows point at the dummy word (silence), as do the default instrument 0 and some tails of samples
+    bool silent = true;
+    for (uint32_t i = 0; i < frames && silent; i++) {
+        silent = data[i] == 0;
+    }
+    if (in.length_words <= DUMMY_WORDS || silent) {
+        return false;
+    }
+    *out = (RjgInstrumentPcm) { .data = data, .frames = frames };
+    // a looping sound repeats from its loop offset (bytes) to its end
+    if (in.loops < 0 && in.loop_offset < frames) {
+        out->loop_start = in.loop_offset;
+        out->loop_frames = frames - in.loop_offset;
+    }
+    return true;
+}
+
 RjgVoiceState rjg_voice_state(const RjgPlayer* player, int voice) {
     const RjgVoice* v = &player->voices[voice];
     return (RjgVoiceState) { .note = v->shown_note, .instrument = v->shown_instrument };

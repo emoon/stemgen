@@ -89,6 +89,23 @@ static uint32_t synthdream_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t synthdream_sample_count(void* user_data) {
+    return sdr_instrument_count((const SdrPlayer*)user_data);
+}
+
+static bool synthdream_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SdrPlayer* player = (const SdrPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!sdr_instrument_pcm(player, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_synthdream = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "synthdream",
@@ -103,6 +120,8 @@ const NuadePlayer nuade_player_synthdream = {
     .metadata = synthdream_metadata,
     .voice_info = synthdream_voice_info,
     .grid_ticks = synthdream_grid_ticks,
+    .sample_count = synthdream_sample_count,
+    .sample_get = synthdream_sample_get,
 };
 
 SdrPlayer* sdr_from_nuade(NuadeSong* song) {

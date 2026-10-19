@@ -32,6 +32,19 @@ const char* sonix_song_get_error(const SonixSong* song);
 bool sonix_song_describe_event(const SonixSong* song, int channel, uint32_t pos, NuadeEvent* out);
 const char* sonix_song_get_instrument_name(const SonixSong* song, uint8_t instrument_index);
 
+// The PCM of an instrument slot (0 to SONIX_INSTRUMENTS - 1): a synth instrument's base waveform, the first zone of a
+// multi-sample instrument, or its sample. rate is the Hz it plays at its base note, 0 if not known. False for a slot
+// with no data.
+#define SONIX_INSTRUMENTS 64
+typedef struct SonixInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t rate;
+    uint32_t loop_start;
+    uint32_t loop_frames;
+} SonixInstrumentPcm;
+bool sonix_song_instrument_pcm(const SonixSong* song, uint8_t instrument_index, SonixInstrumentPcm* out);
+
 // Load the song's external instrument and sample files, searched in the directories around song_path (Instruments/
 // next to the song and up to two levels above). Needs io->list_dir: names are matched case-insensitively. Returns the
 // number loaded.

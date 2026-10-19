@@ -120,6 +120,10 @@ void jmf_text(const JmfPlayer* player, JmfText which, char* out, size_t cap);
 // Ticks per sequencer step.
 uint32_t jmf_grid_ticks(const JmfPlayer* player);
 
+// The looping waveform a voice plays, numbered as the voices report their instrument: 1 the first, 2 the second.
+// False for any other number.
+bool jmf_waveform_pcm(const JmfPlayer* player, uint32_t waveform, const int8_t** data, uint32_t* frames);
+
 // The period of the last note a voice started, 0 if none.
 uint16_t jmf_voice_period(const JmfPlayer* player, uint32_t voice);
 

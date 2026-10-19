@@ -203,6 +203,14 @@ int fc_order_count(const FcModule* module);
 // Rows of the longest pattern among the voices at sequence position `order` (a pattern ends at its END mark).
 int fc_pattern_rows(const FcModule* module, int order);
 FcVoiceState fc_voice_state(const FcModule* module, int voice);
+
+// The sounds a frequency sequence can pick, and the PCM of sound `n` (0 .. fc_sound_count - 1): signed 8 bit, sizes in
+// bytes. `number` names the sound: the waveform slot (0 .. 9 samples, 10 .. 89 wavetables), or 90 + slot * 20 + entry
+// for an entry of a multi sample. (The voices report the volume sequence as their instrument, which does not name a
+// sound.) False for a slot without data.
+uint32_t fc_sound_count(const FcModule* module);
+bool fc_sound_pcm(const FcModule* module, uint32_t n, uint32_t* number, const int8_t** data, uint32_t* length,
+                  uint32_t* loop_start, uint32_t* loop_length);
 // Line `row` of the pattern `voice` plays at `order`; empty past that voice's own pattern end.
 FcCell fc_cell(const FcModule* module, int order, int voice, int row);
 

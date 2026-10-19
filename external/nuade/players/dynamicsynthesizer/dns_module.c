@@ -17,7 +17,8 @@
 #define MAX_SAMPLES_SIZE 0x10000000u
 #define SONG_FIELD_SIZE 0x20 // bytes of a field of the song table: 16 songs of one word
 #define INSTRUMENT_SIZE 96
-#define ROW_SIZE 24 // bytes of a row: six tracks of four bytes
+#define MAX_INSTRUMENTS 256 // the replayer addresses them with a byte
+#define ROW_SIZE 24         // bytes of a row: six tracks of four bytes
 #define PATTERN_SIZE 0x60
 #define PERIOD_COUNT 64
 
@@ -474,6 +475,20 @@ DnsInstrument dns_read_instrument(const DnsModule* module, unsigned number) {
                              .release_interval = dns_u16(m, at + 0x28),
                              .release_step = (int16_t)dns_u16(m, at + 0x2A),
                              .detune = dns_u16(m, at + 0x4A) };
+}
+
+unsigned dns_instrument_count(const DnsModule* module, uint32_t samples_size) {
+    unsigned count = 0;
+    // The table has no end marker: it runs while the records fit the module and their runs fit the samples.
+    while (count < MAX_INSTRUMENTS && module->instruments + (count + 1) * INSTRUMENT_SIZE <= module->memory.size) {
+        const DnsInstrument in = dns_read_instrument(module, count);
+        if ((uint64_t)in.start + (uint64_t)in.start_words * 2 > samples_size
+            || (in.loop_words > 1 && (uint64_t)in.loop + (uint64_t)in.loop_words * 2 > samples_size)) {
+            break;
+        }
+        count++;
+    }
+    return count;
 }
 
 DnsTrackRow dns_read_track_row(const DnsModule* module, unsigned track, uint16_t position) {

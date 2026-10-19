@@ -93,6 +93,7 @@ struct KimPlayer {
     uint8_t row;
     int row_countdown; // a signed byte (-128..127): ticks to the next row less one; a row starts below zero
     bool fault;        // the data led out of what the port models
+    uint32_t instrument_count; // one more than the highest instrument number the song starts
     KimVoice voices[KIM_VOICES];
 };
 
@@ -111,6 +112,14 @@ KimTickResult kim_tick(KimPlayer* player, NuadeVoices* voices);
 uint32_t kim_grid_ticks(const KimPlayer* player);
 
 KimVoiceState kim_voice_state(const KimPlayer* player, uint32_t voice);
+
+// Instruments the song uses: one more than the highest number it starts.
+uint32_t kim_instrument_count(const KimPlayer* player);
+
+// The sound of instrument `number` as the voice starts it, in bytes. A loop that does not lie inside that sound is
+// not given (loop_length 0). False when the instrument has no sound in the data.
+bool kim_instrument_pcm(const KimPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 KimPlayer* kim_from_nuade(NuadeSong* song);

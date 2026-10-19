@@ -135,6 +135,29 @@ static uint32_t soundfx_tracker_cells(void* user_data, const NuadePosition* at, 
     return nuade_tracker_fill(at, SFX_CHANNELS, rows, channel, row_lo, row_hi, out, cap, soundfx_cell, user_data);
 }
 
+static uint32_t soundfx_sample_count(void* user_data) {
+    (void)user_data;
+    return SFX_INSTRUMENTS;
+}
+
+static bool soundfx_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SfxModule* module = (const SfxModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sfx_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = sfx_instrument_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundfx = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundfx",
@@ -151,6 +174,8 @@ const NuadePlayer nuade_player_soundfx = {
     .voice_info = soundfx_voice_info,
     .tracker_info = soundfx_tracker_info,
     .tracker_cells = soundfx_tracker_cells,
+    .sample_count = soundfx_sample_count,
+    .sample_get = soundfx_sample_get,
 };
 
 SfxModule* sfx_from_nuade(NuadeSong* song) {

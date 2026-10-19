@@ -106,6 +106,30 @@ JoTickResult jo_tick(JoPlayer* player, NuadeVoices* voices) {
     return jo_c_tick(&player->state.c, &player->module, voices);
 }
 
+uint32_t jo_instrument_count(const JoPlayer* player) {
+    switch (player->replayer) {
+        case JoReplayer_A:
+            return jo_a_instrument_count(player->version_a);
+        case JoReplayer_B:
+            return 0;
+        case JoReplayer_C:
+            break;
+    }
+    return jo_c_instrument_count(&player->module);
+}
+
+bool jo_instrument_sound(const JoPlayer* player, uint32_t number, JoSound* out) {
+    switch (player->replayer) {
+        case JoReplayer_A:
+            return jo_a_instrument_sound(player->version_a, &player->module, number, out);
+        case JoReplayer_B:
+            return false;
+        case JoReplayer_C:
+            break;
+    }
+    return jo_c_instrument_sound(&player->module, number, out);
+}
+
 JoVoiceState jo_voice_state(const JoPlayer* player, int voice) {
     if (voice < 0 || voice >= JO_VOICES) {
         return (JoVoiceState) { .note = -1, .instrument = -1 };

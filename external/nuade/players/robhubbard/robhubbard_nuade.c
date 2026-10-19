@@ -4,6 +4,7 @@
 #include <nuade/player.h>
 
 #include "nuade_base.h"
+#include "rh_module.h"
 #include <nuade/players/robhubbard.h>
 #include <stdio.h>
 
@@ -65,6 +66,24 @@ static uint32_t robhubbard_grid_ticks(void* user_data, uint32_t subsong) {
     return tempo > 0 ? (uint32_t)tempo : 1;
 }
 
+static uint32_t robhubbard_sample_count(void* user_data) {
+    return ((const RhPlayer*)user_data)->module->sample_count;
+}
+
+static bool robhubbard_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    RhSamplePcm pcm;
+    if (!rh_module_sample_pcm(((const RhPlayer*)user_data)->module, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_robhubbard = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "robhubbard",
@@ -79,6 +98,8 @@ const NuadePlayer nuade_player_robhubbard = {
     .metadata = robhubbard_metadata,
     .voice_info = robhubbard_voice_info,
     .grid_ticks = robhubbard_grid_ticks,
+    .sample_count = robhubbard_sample_count,
+    .sample_get = robhubbard_sample_get,
 };
 
 RhPlayer* rh_from_nuade(NuadeSong* song) {

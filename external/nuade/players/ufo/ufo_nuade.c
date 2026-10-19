@@ -76,6 +76,23 @@ static uint32_t ufo_voice_info(void* user_data, NuadeVoiceInfo* out, uint32_t ca
     return n;
 }
 
+static uint32_t ufo_sample_count(void* user_data) {
+    (void)user_data;
+    return UFO_INSTRUMENTS;
+}
+
+static bool ufo_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!ufo_instrument_pcm((const UfoPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_ufo = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "ufo",
@@ -89,6 +106,8 @@ const NuadePlayer nuade_player_ufo = {
     .tick = ufo_tick_song,
     .metadata = ufo_metadata,
     .voice_info = ufo_voice_info,
+    .sample_count = ufo_sample_count,
+    .sample_get = ufo_sample_get,
 };
 
 UfoPlayer* ufo_from_nuade(NuadeSong* song) {

@@ -61,6 +61,23 @@ static uint32_t fcbsi_grid_ticks_song(void* user_data, uint32_t subsong) {
     return fcbsi_grid_ticks();
 }
 
+static uint32_t fcbsi_sample_count(void* user_data) {
+    (void)user_data;
+    return FC_INSTRUMENT_COUNT;
+}
+
+static bool fcbsi_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!fcbsi_instrument_pcm((const FcBsiPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_fcbsi = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "fcbsi",
@@ -75,6 +92,8 @@ const NuadePlayer nuade_player_fcbsi = {
     .metadata = fcbsi_metadata,
     .voice_info = fcbsi_voice_info,
     .grid_ticks = fcbsi_grid_ticks_song,
+    .sample_count = fcbsi_sample_count,
+    .sample_get = fcbsi_sample_get,
 };
 
 FcBsiPlayer* fcbsi_from_nuade(NuadeSong* song) {

@@ -50,6 +50,15 @@ typedef struct SplRecord {
     uint16_t history[SPL_HISTORY]; // the last periods, newest first
 } SplRecord;
 
+// A sound of the module: what an instrument record names, found by walking the command streams.
+typedef struct SplSound {
+    int32_t id;          // the number the voice reports (spl_record_sound_id)
+    uint32_t offset;     // of the sample in the hunk
+    uint32_t frames;     // bytes
+    uint32_t loop_start; // bytes
+    uint32_t loop_frames;
+} SplSound;
+
 typedef struct SplVoice {
     uint32_t stream_at;
     uint32_t depth; // entries on the return stack
@@ -134,6 +143,8 @@ typedef struct SplModule {
 
 struct SplPlayer {
     SplModule* module;
+    SplSound* sounds; // every sample a record in the command streams plays, found when the player is created
+    uint32_t sound_count;
     const SplSong* song;
     SplVoice voices[SPL_VOICES];
     uint32_t voice_count;
@@ -154,6 +165,16 @@ SplPlayer* spl_create(const uint8_t* data, size_t size);
 void spl_destroy(SplPlayer* player);
 
 int spl_subsong_count(const SplPlayer* player);
+
+// The number a record's sound has: the sample number (Table family) or the sample's word offset in the module (the
+// others; a start the record holds as an address, or relative to the build's sample base).
+int32_t spl_record_sound_id(const SplBuild* build, const SplRecord* record);
+
+// The sounds the command streams of all subsongs play, one for each number, and the n-th one's PCM (8 bit). A sample
+// loops as a whole when the replayer leaves its registers alone; the Table family has a loop start of its own.
+uint32_t spl_sound_count(const SplPlayer* player);
+bool spl_sound_pcm(const SplPlayer* player, uint32_t n, int32_t* id, const int8_t** data, uint32_t* frames,
+                   uint32_t* loop_start, uint32_t* loop_frames);
 
 // Length of a tick in 1 / SPL_TIMEBASE_HZ seconds: the CIA timer value of the module header.
 uint32_t spl_tick_length(const SplPlayer* player);

@@ -758,3 +758,33 @@ MdlVoiceState mdl_voice_state(const MdlPlayer* player, int voice) {
     return (MdlVoiceState) { .note = v->shown_note,
                              .instrument = v->instrument_number != 0 ? v->instrument_number - 1 : -1 };
 }
+
+// The highest index of the instrument table is the byte before it; entry 0 is not an instrument.
+int mdl_sample_count(MdlPlayer* player) {
+    const MdlModule* module = &player->module;
+    const uint32_t base = module->base[MdlTable_Instrument];
+    return base > 0 && base <= module->size ? module->bytes[base - 1] : 0;
+}
+
+bool mdl_sample_pcm(MdlPlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_length) {
+    MdlModule* module = &player->module;
+    if (n < 0 || n >= mdl_sample_count(player)) {
+        return false;
+    }
+    const bool was_unmapped = module->unmapped; // reading the tables must not stop the song
+    bool found = false;
+    const uint32_t offset = mdl_instrument_offset(module, (uint8_t)(n + 1));
+    MdlWave wave;
+    if (offset != MDL_NO_OFFSET) {
+        const MdlInstrument instrument = mdl_instrument(module, offset);
+        found = instrument.type != MdlInstrumentType_Synth && mdl_wave(module, mdl_region_wave(&instrument, 0), &wave)
+                && wave.length != 0 && (uint64_t)wave.data + wave.length <= module->size;
+        if (found) {
+            *data = (const int8_t*)module->bytes + wave.data;
+            *length = wave.length;
+            *loop_length = instrument.type == MdlInstrumentType_Sample ? wave.length : 0;
+        }
+    }
+    module->unmapped = was_unmapped;
+    return found;
+}

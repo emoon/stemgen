@@ -128,6 +128,11 @@ JtTickResult jt_tick(JtPlayer* player, NuadeVoices* voices);
 // Ticks per sequencer step of a subsong (0 for a subsong that does not exist).
 int jt_ticks_per_step(const JtPlayer* player, int subsong);
 
+// The instruments of the table, and the sample of one (`n` is the instrument number the patterns use). False for an
+// instrument whose sample is not inside the module.
+uint32_t jt_instrument_count(const JtPlayer* player);
+bool jt_instrument_pcm(const JtPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                       uint32_t* loop_frames);
 JtVoiceState jt_voice_state(const JtPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

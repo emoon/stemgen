@@ -116,6 +116,10 @@ bool ap_start(ApPlayer* player, NuadeVoices* voices);
 
 ApTickResult ap_tick(ApPlayer* player, NuadeVoices* voices);
 
+// The PCM of instrument `inst` (0..AP_INSTRUMENT_COUNT-1), in bytes. False for an instrument without a sample.
+bool ap_instrument_pcm(const ApPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
+
 ApVoiceState ap_voice_state(const ApPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

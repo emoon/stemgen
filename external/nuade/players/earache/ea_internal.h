@@ -70,6 +70,8 @@ typedef struct EaInstrument {
 } EaInstrument;
 
 EaInstrument ea_instrument(const EaModule* module, uint32_t index);
+// The records of the instrument table (they run up to the next table).
+uint32_t ea_instrument_count(const EaModule* module);
 
 typedef struct EaSample {
     const int8_t* data;    // null when the entry or the sample start is not inside the file

@@ -82,6 +82,20 @@ static uint32_t dirkbialluch_grid_ticks(void* user_data, uint32_t subsong) {
     return db_grid_ticks((const DbPlayer*)user_data);
 }
 
+static uint32_t dirkbialluch_sample_count(void* user_data) {
+    return (uint32_t)db_program_count((const DbPlayer*)user_data);
+}
+
+static bool dirkbialluch_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!db_program_pcm((const DbPlayer*)user_data, (int)n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8 };
+    return true;
+}
+
 const NuadePlayer nuade_player_dirkbialluch = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "dirkbialluch",
@@ -96,6 +110,8 @@ const NuadePlayer nuade_player_dirkbialluch = {
     .metadata = dirkbialluch_metadata,
     .voice_info = dirkbialluch_voice_info,
     .grid_ticks = dirkbialluch_grid_ticks,
+    .sample_count = dirkbialluch_sample_count,
+    .sample_get = dirkbialluch_sample_get,
 };
 
 DbPlayer* db_from_nuade(NuadeSong* song) {

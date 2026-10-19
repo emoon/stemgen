@@ -150,6 +150,28 @@ static uint32_t quadracomposer_tracker_cells(void* user_data, const NuadePositio
                               out, cap, quadracomposer_cell, module);
 }
 
+static uint32_t quadracomposer_sample_count(void* user_data) {
+    (void)user_data;
+    return QUADRACOMPOSER_SAMPLE_SLOTS;
+}
+
+static bool quadracomposer_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const QcModule* module = ((const QuadraComposerNuade*)user_data)->module;
+    QcSamplePcm pcm;
+    if (!qc_sample_pcm(module, (int)n, &pcm)) {
+        return false;
+    }
+    const char* name = qc_sample_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n + 1,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_quadracomposer = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "quadracomposer",
@@ -166,6 +188,8 @@ const NuadePlayer nuade_player_quadracomposer = {
     .voice_info = quadracomposer_voice_info,
     .tracker_info = quadracomposer_tracker_info,
     .tracker_cells = quadracomposer_tracker_cells,
+    .sample_count = quadracomposer_sample_count,
+    .sample_get = quadracomposer_sample_get,
 };
 
 QcModule* qc_from_nuade(NuadeSong* song) {

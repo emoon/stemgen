@@ -91,8 +91,9 @@ const int8_t* psh_chip_pointer(const PshModule* m, int64_t offset);
 // The action of an order list word from PSH_ORDER_CODE_MIN up; false for a word that is no code.
 bool psh_order_action(const PshLayout* layout, uint16_t word, PshOrderAction* action);
 
-// The static walk of the song (psh_check.c): false when a voice reaches something the replayer does not define.
-bool psh_check_song(const PshModule* m);
+// The static walk of the song (psh_check.c): false when a voice reaches something the replayer does not define. It
+// notes the instruments of the old layout that the song selects in PshModule.used_instruments.
+bool psh_check_song(PshModule* m);
 
 // The replayer's state
 

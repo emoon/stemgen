@@ -69,6 +69,20 @@ static uint32_t desire_grid_ticks(void* user_data, uint32_t subsong) {
     return DSR_GRID_TICKS;
 }
 
+static uint32_t desire_sample_count(void* user_data) {
+    return (uint32_t)dsr_instrument_count((const DsrPlayer*)user_data);
+}
+
+static bool desire_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!dsr_instrument_pcm((const DsrPlayer*)user_data, (int)n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8 };
+    return true;
+}
+
 const NuadePlayer nuade_player_desire = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "desire",
@@ -83,6 +97,8 @@ const NuadePlayer nuade_player_desire = {
     .metadata = desire_metadata,
     .voice_info = desire_voice_info,
     .grid_ticks = desire_grid_ticks,
+    .sample_count = desire_sample_count,
+    .sample_get = desire_sample_get,
 };
 
 DsrPlayer* dsr_from_nuade(NuadeSong* song) {

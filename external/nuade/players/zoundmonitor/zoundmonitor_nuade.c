@@ -145,6 +145,29 @@ static uint32_t zoundmonitor_tracker_cells(void* user_data, const NuadePosition*
     return nuade_tracker_fill(at, ZM_VOICES, ZM_ROWS, channel, row_lo, row_hi, out, cap, zoundmonitor_cell, user_data);
 }
 
+static uint32_t zoundmonitor_sample_count(void* user_data) {
+    (void)user_data;
+    return ZM_INSTRUMENTS;
+}
+
+static bool zoundmonitor_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const ZmPlayer* player = (const ZmPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!zm_instrument_pcm(player, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = zm_instrument_name(player, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_zoundmonitor = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "zoundmonitor",
@@ -161,6 +184,8 @@ const NuadePlayer nuade_player_zoundmonitor = {
     .voice_info = zoundmonitor_voice_info,
     .tracker_info = zoundmonitor_tracker_info,
     .tracker_cells = zoundmonitor_tracker_cells,
+    .sample_count = zoundmonitor_sample_count,
+    .sample_get = zoundmonitor_sample_get,
 };
 
 ZmPlayer* zm_from_nuade(NuadeSong* song) {

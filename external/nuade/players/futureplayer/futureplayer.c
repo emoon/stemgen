@@ -342,7 +342,20 @@ typedef struct FpWalk {
     uint32_t* pending; // streams to walk
     size_t pending_count;
     size_t pending_capacity;
+    uint32_t instrument_address[FP_MAX_INSTRUMENTS]; // the instruments met, in order
+    uint32_t instrument_count;
 } FpWalk;
+
+static void fp_walk_note_instrument(FpWalk* w, uint32_t instrument) {
+    for (uint32_t i = 0; i < w->instrument_count; i++) {
+        if (w->instrument_address[i] == instrument) {
+            return;
+        }
+    }
+    if (w->instrument_count < FP_MAX_INSTRUMENTS) {
+        w->instrument_address[w->instrument_count++] = instrument;
+    }
+}
 
 static bool fp_walk_push(FpWalk* w, uint32_t address) {
     if (w->pending_count == w->pending_capacity) {
@@ -406,6 +419,7 @@ static bool fp_walk_stream(FpWalk* w, uint32_t pos) {
                 if (!fp_in_hunk(m, operand, 4) || !fp_instrument_valid(m, fp_u32(m, operand))) {
                     return false;
                 }
+                fp_walk_note_instrument(w, fp_u32(m, operand));
                 pos += 6;
                 break;
             case FpCommand_Arpeggio:
@@ -479,6 +493,8 @@ static bool fp_module_parse(const uint8_t* file, size_t size, uint8_t** image, F
     free(walk.seen);
     free(walk.pending);
     m->subsongs = count;
+    m->instrument_count = walk.instrument_count;
+    memcpy(m->instrument_address, walk.instrument_address, sizeof(walk.instrument_address));
     if (!valid || count == 0) {
         free(*image);
         return false;
@@ -519,18 +535,15 @@ static void fp_hardware_reset(FpPlayer* p) {
     }
 }
 
-// The display number of an instrument: the order they were first played in.
-static int fp_instrument_number(FpPlayer* p, uint32_t instrument) {
-    for (uint32_t i = 0; i < p->instrument_count; i++) {
-        if (p->instrument_address[i] == instrument) {
+// The number of an instrument: its place among the instruments the songs select; -1 for one they do not (the
+// instrument a voice starts with).
+static int fp_instrument_number(const FpModule* m, uint32_t instrument) {
+    for (uint32_t i = 0; i < m->instrument_count; i++) {
+        if (m->instrument_address[i] == instrument) {
             return (int)i;
         }
     }
-    if (p->instrument_count < FP_MAX_INSTRUMENTS) {
-        p->instrument_address[p->instrument_count] = instrument;
-        return (int)p->instrument_count++;
-    }
-    return FP_MAX_INSTRUMENTS - 1;
+    return -1;
 }
 
 // The sequencer
@@ -911,7 +924,7 @@ static void fp_sound_run(FpPlayer* p, int index) {
     v->paula.period = (uint16_t)(period + v->detune);
     if (v->new_note) {
         v->shown_note = nuade_period_to_note(v->base_period);
-        v->shown_instrument = fp_instrument_number(p, v->instrument);
+        v->shown_instrument = fp_instrument_number(m, v->instrument);
     }
 
     // Sample: written at a new note and, for a dynamic sample or a sequence of samples, every tick
@@ -992,16 +1005,11 @@ static void fp_sync(FpPlayer* p, NuadeVoices* voices) {
     }
 }
 
-// Mutable player state: everything but the module and the instrument numbering.
+// Mutable player state: everything but the module.
 static void fp_state_clear(FpPlayer* p) {
     const FpModule module = p->module;
-    const uint32_t instrument_count = p->instrument_count;
-    uint32_t instrument_address[FP_MAX_INSTRUMENTS];
-    memcpy(instrument_address, p->instrument_address, sizeof(instrument_address));
     memset(p, 0, sizeof(*p));
     p->module = module;
-    p->instrument_count = instrument_count;
-    memcpy(p->instrument_address, instrument_address, sizeof(instrument_address));
 }
 
 FpCreateResult fp_create(const uint8_t* data, size_t size) {
@@ -1114,4 +1122,32 @@ void fp_module_string(const FpPlayer* player, uint32_t address, char* out, size_
         out[length++] = (char)c;
     }
     out[length] = 0;
+}
+
+bool fp_instrument_pcm(const FpPlayer* player, uint32_t number, const int8_t** data, uint32_t* bytes, bool* loops) {
+    const FpModule* m = &player->module;
+    if (number >= m->instrument_count) {
+        return false;
+    }
+    const uint32_t set = fp_instrument_set(m, m->instrument_address[number]);
+    // a sequence of samples plays several; a dynamic one is a window that the modulation tables move through its data
+    if (fp_set_is_sequence(m, set)) {
+        return false;
+    }
+    const FpSample sample = fp_read_sample(m, fp_set_target(m, set));
+    const int8_t* pcm = fp_chip(m, sample.address);
+    const uint32_t length = sample.bytes & ~1u;
+    if (sample.dynamic || pcm == nullptr || length == 0) {
+        return false;
+    }
+    // what lies past the image is silence
+    const uint32_t available = m->image_size - (sample.address - FP_BASE_ADDRESS);
+    *data = pcm;
+    *bytes = length < available ? length : available;
+    *loops = !sample.one_shot;
+    return true;
+}
+
+uint32_t fp_instrument_count(const FpPlayer* player) {
+    return player->module.instrument_count;
 }

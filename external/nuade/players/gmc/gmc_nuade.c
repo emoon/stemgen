@@ -11,6 +11,7 @@
 #define GMC_NUADE_VOICES 4
 #define GMC_TICK_HZ 50
 #define GMC_ROWS 64
+#define GMC_SAMPLES 15
 
 // The format has no mark: a file that passes the layout checks is only "unsure".
 static NuadeProbe gmc_nuade_probe(const uint8_t* data, size_t size, const char* filename) {
@@ -113,6 +114,29 @@ static uint32_t gmc_nuade_tracker_cells(void* user_data, const NuadePosition* at
                               user_data);
 }
 
+static uint32_t gmc_nuade_sample_count(void* user_data) {
+    (void)user_data;
+    return GMC_SAMPLES;
+}
+
+static bool gmc_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const GmcModule* module = (const GmcModule*)user_data;
+    if (n >= GMC_SAMPLES) {
+        return false;
+    }
+    const GmcSample* sample = &module->samples[n];
+    if (sample->data == nullptr || sample->length == 0) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = sample->data,
+                                 .frames = sample->length,
+                                 .bits = 8,
+                                 .loop_start = sample->loop_start,
+                                 .loop_frames = sample->loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_gmc = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "gmc",
@@ -129,6 +153,8 @@ const NuadePlayer nuade_player_gmc = {
     .voice_info = gmc_nuade_voice_info,
     .tracker_info = gmc_nuade_tracker_info,
     .tracker_cells = gmc_nuade_tracker_cells,
+    .sample_count = gmc_nuade_sample_count,
+    .sample_get = gmc_nuade_sample_get,
 };
 
 GmcModule* gmc_from_nuade(NuadeSong* song) {

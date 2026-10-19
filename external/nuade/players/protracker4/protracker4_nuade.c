@@ -113,6 +113,26 @@ static uint32_t protracker4_tracker_cells(void* user_data, const NuadePosition* 
     return nuade_tracker_fill(at, PT4_VOICES, PT4_ROWS, channel, row_lo, row_hi, out, cap, protracker4_cell, user_data);
 }
 
+static uint32_t protracker4_sample_count(void* user_data) {
+    (void)user_data;
+    return PT4_SAMPLES;
+}
+
+static bool protracker4_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    Pt4SamplePcm pcm;
+    if (!pt4_sample_pcm((const Pt4Player*)user_data, (int)n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = pcm.name[0] != '\0' ? pcm.name : nullptr,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_protracker4 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "protracker4",
@@ -129,6 +149,8 @@ const NuadePlayer nuade_player_protracker4 = {
     .voice_info = protracker4_voice_info,
     .tracker_info = protracker4_tracker_info,
     .tracker_cells = protracker4_tracker_cells,
+    .sample_count = protracker4_sample_count,
+    .sample_get = protracker4_sample_get,
 };
 
 Pt4Player* pt4_from_nuade(NuadeSong* song) {

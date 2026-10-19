@@ -24,6 +24,7 @@
 #define WB_BAD_POINTER 0xFFFFFFFFu
 #define WB_ZERO_STREAM 0xFFFFFFFEu // a pattern stream in the part of the address space that reads as zeros
 #define WB_VOICE_RECORD_BYTES 0x84u
+#define WB_INSTRUMENT_BYTES 8u // one record of the instrument table; a voice names one by its byte offset (8 bits)
 // UADE loads every module at this address; chip memory behind it is zero up to 2 MiB and there is no memory up to the
 // CIAs: reads there give zeros.
 #define WB_UADE_LOAD_ADDRESS 0xF000u

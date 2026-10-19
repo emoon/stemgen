@@ -162,6 +162,22 @@ const char* cw_instrument_name(const CwPlayer* player, int instrument);
 
 CwVoiceState cw_voice_state(const CwPlayer* player, int voice);
 
+// What a sample zone plays: the bytes from its start to its end, as Paula gets them.
+typedef struct CwZonePcm {
+    int program;      // the program number (CwVoiceState.instrument) that plays it
+    const char* name; // the sample file
+    const int8_t* data;
+    uint32_t length; // bytes
+    uint32_t loop_start;
+    uint32_t loop_length; // 0 = one-shot
+    uint32_t rate;        // Hz of key 60
+} CwZonePcm;
+
+// The zone `zone` (0..CW_ZONES_PER_INSTRUMENT - 1) of the `block`-th instrument block of the file
+// (0..player->module.instrument_count - 1). False for a zone without a loaded sample, and for a block whose program a
+// later block redefines.
+bool cw_zone_pcm(const CwPlayer* player, int block, int zone, CwZonePcm* out);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 CwPlayer* cw_from_nuade(NuadeSong* song);
 

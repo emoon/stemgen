@@ -72,6 +72,22 @@ static uint32_t emsv6_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t emsv6_sample_count(void* user_data) {
+    return ems6_instrument_count((const Ems6Player*)user_data);
+}
+
+static bool emsv6_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!ems6_instrument_pcm((const Ems6Player*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_emsv6 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "emsv6",
@@ -86,6 +102,8 @@ const NuadePlayer nuade_player_emsv6 = {
     .metadata = emsv6_metadata,
     .voice_info = emsv6_voice_info,
     .grid_ticks = emsv6_grid_ticks,
+    .sample_count = emsv6_sample_count,
+    .sample_get = emsv6_sample_get,
 };
 
 Ems6Player* ems6_from_nuade(NuadeSong* song) {

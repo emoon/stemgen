@@ -1112,3 +1112,22 @@ bool sc3_modeled(const ScoModule* m) {
     free(w.patterns);
     return ok;
 }
+
+// The sample of an instrument (sample_start / stream_start): an 8SVX body, one shot and then the repeat, or the sample
+// table entry's bytes. Wave forms (sweeps, sequences) are no sample.
+bool sc3_instrument_pcm(const ScoModule* m, uint32_t instrument, ScoPcm* out) {
+    const Instrument in = instrument_read(m, (uint8_t)instrument);
+    if (in.wave != Sco3Wave_Sample && in.wave != Sco3Wave_Stream) {
+        return false;
+    }
+    const ScoSampleBounds bounds = sample_bounds(m, in.sample);
+    const Svx svx = svx_read(m, bounds.start);
+    if (svx.valid) {
+        if (svx.repeat < 0) {
+            return false;
+        }
+        const uint32_t repeat = (uint32_t)svx.repeat;
+        return sco_pcm_make(m, svx.body, svx.oneshot + repeat, svx.oneshot, repeat, out);
+    }
+    return bounds.end >= bounds.start + 2 && sco_pcm_make(m, bounds.start, bounds.end - 2 - bounds.start, 0, 0, out);
+}

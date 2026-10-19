@@ -106,6 +106,13 @@ uint32_t ea_grid_ticks(const EaPlayer* player);
 
 EaVoiceState ea_voice_state(const EaPlayer* player, int voice);
 
+// The sounds are the instruments of the module (the number the cells and EaVoiceState use); each plays one sample of
+// the sample table, so two instruments may give the same data. The PCM is signed 8 bit, `bytes` its length, `loops`
+// that the instrument repeats all of it while its gate is open. False for an instrument whose sample is not in the
+// file.
+uint32_t ea_sound_count(const EaPlayer* player);
+bool ea_sound_pcm(const EaPlayer* player, uint32_t instrument, const int8_t** data, uint32_t* bytes, bool* loops);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 EaPlayer* ea_from_nuade(NuadeSong* song);
 

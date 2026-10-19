@@ -81,6 +81,20 @@ static uint32_t jasonpage_grid_ticks(void* user_data, uint32_t subsong) {
     return jp_grid_ticks((const JpPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t jasonpage_sample_count(void* user_data) {
+    return jp_sample_count((const JpPlayer*)user_data);
+}
+
+static bool jasonpage_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!jp_sample_pcm((const JpPlayer*)user_data, n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8 };
+    return true;
+}
+
 const NuadePlayer nuade_player_jasonpage = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "jasonpage",
@@ -95,6 +109,8 @@ const NuadePlayer nuade_player_jasonpage = {
     .metadata = jasonpage_metadata,
     .voice_info = jasonpage_voice_info,
     .grid_ticks = jasonpage_grid_ticks,
+    .sample_count = jasonpage_sample_count,
+    .sample_get = jasonpage_sample_get,
 };
 
 JpPlayer* jp_from_nuade(NuadeSong* song) {

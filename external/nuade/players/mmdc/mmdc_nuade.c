@@ -116,6 +116,22 @@ static uint32_t mmdc_nuade_tracker_cells(void* user_data, const NuadePosition* a
     return nuade_tracker_fill(at, MMDC_VOICES, shape.lines, channel, row_lo, row_hi, out, cap, mmdc_nuade_cell, player);
 }
 
+static uint32_t mmdc_nuade_sample_count(void* user_data) {
+    return ((const MmdcPlayer*)user_data)->module.sample_count;
+}
+
+static bool mmdc_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!mmdc_sample_pcm((const MmdcPlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_mmdc = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "mmdc",
@@ -132,6 +148,8 @@ const NuadePlayer nuade_player_mmdc = {
     .position = mmdc_nuade_position,
     .tracker_info = mmdc_nuade_tracker_info,
     .tracker_cells = mmdc_nuade_tracker_cells,
+    .sample_count = mmdc_nuade_sample_count,
+    .sample_get = mmdc_nuade_sample_get,
 };
 
 MmdcPlayer* mmdc_from_nuade(NuadeSong* song) {

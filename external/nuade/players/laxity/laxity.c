@@ -944,6 +944,30 @@ int lx_instrument_count(const LxPlayer* player) {
     return player->module.header.instrument_count;
 }
 
+bool lx_instrument_pcm(const LxPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    const LxModule* m = &player->module;
+    if (instrument < 1 || instrument > m->header.instrument_count) {
+        return false;
+    }
+    const Instrument ins = read_instrument(module_memory(m), record_offset(instrument));
+    const int64_t start = m->header.sample_offset[instrument];
+    const int64_t bytes = 2 * (int64_t)ins.length;
+    if (ins.synth || bytes == 0 || start < 0 || start + bytes > (int64_t)m->image_size) {
+        return false;
+    }
+    *data = (const int8_t*)m->image + start;
+    *length = (uint32_t)bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    const int64_t loop_end = 2 * ((int64_t)ins.loop_start + ins.loop_length);
+    if (ins.loop_length != 0 && loop_end <= bytes) {
+        *loop_start = 2u * ins.loop_start;
+        *loop_length = 2u * ins.loop_length;
+    }
+    return true;
+}
+
 LxPosition lx_position(const LxPlayer* player) {
     const LxSong* s = &player->song;
     return (LxPosition) { .order = s->shown_order,

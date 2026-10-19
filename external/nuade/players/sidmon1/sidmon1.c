@@ -765,6 +765,71 @@ bool sd1_sample_name(const Sd1Player* player, int instrument, char out[SD1_SAMPL
     return true;
 }
 
+// The old replayer's fixed samples are played by the instrument numbers from FIRST_SPECIAL_INSTRUMENT on when the song
+// switches them on.
+static bool uses_special_samples(const Sd1Player* player) {
+    const Sd1Layout* l = &player->module.layout;
+    const Image m = { .bytes = player->module.memory, .size = player->module.size };
+    return l->old_replayer && image_u32(&m, l->special_flag) == 1;
+}
+
+int sd1_exportable_count(const Sd1Player* player) {
+    const int count = player->module.layout.instrument_count;
+    const int special_end = FIRST_SPECIAL_INSTRUMENT + SD1_SPECIAL_SAMPLES;
+    return uses_special_samples(player) && count < special_end ? special_end : count;
+}
+
+bool sd1_instrument_pcm(const Sd1Player* player, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length) {
+    const Sd1Layout* l = &player->module.layout;
+    const Image m = { .bytes = player->module.memory, .size = player->module.size };
+    if (instrument < 1 || instrument > sd1_exportable_count(player)) {
+        return false;
+    }
+    const uint32_t index = (uint32_t)(instrument - 1);
+    uint32_t from;
+    uint32_t bytes;
+    uint32_t loop = 0;
+    uint32_t loop_bytes = 0;
+    if (uses_special_samples(player) && index >= FIRST_SPECIAL_INSTRUMENT) {
+        const Sd1SpecialSample* special = &l->special_samples[index - FIRST_SPECIAL_INSTRUMENT];
+        from = special->start;
+        bytes = (uint32_t)special->length_words * 2u;
+    } else {
+        if (l->old_replayer || index >= (uint32_t)l->instrument_count) {
+            return false;
+        }
+        const uint32_t waveform = image_u32(&m, l->instruments + index * INSTRUMENT_SIZE + INSTRUMENT_WAVEFORM);
+        if (waveform < FIRST_SAMPLE_WAVEFORM || waveform >= FIRST_SAMPLE_WAVEFORM + (uint32_t)l->sample_count) {
+            return false;
+        }
+        const uint32_t entry = l->samples + 4 + (waveform - FIRST_SAMPLE_WAVEFORM) * SAMPLE_ENTRY_SIZE;
+        const uint32_t base = l->samples + image_u32(&m, l->samples) + 4;
+        const uint32_t start = image_u32(&m, entry + SAMPLE_START);
+        const uint32_t end = image_u32(&m, entry + SAMPLE_END);
+        const uint32_t loop_at = image_u32(&m, entry + SAMPLE_LOOP);
+        if (end <= start) {
+            return false;
+        }
+        // Paula ignores bit 0 of an address
+        from = (base + start) & ~1u;
+        bytes = ((base + end) & ~1u) - from;
+        // The sample plays once from its start, then the loop registers repeat [loop, end).
+        if (loop_at != l->no_loop && loop_at >= start && loop_at < end) {
+            loop = ((base + loop_at) & ~1u) - from;
+            loop_bytes = bytes - loop;
+        }
+    }
+    if (bytes == 0 || from >= m.size || bytes > m.size - from) {
+        return false;
+    }
+    *data = (const int8_t*)(m.bytes + from);
+    *length = bytes;
+    *loop_start = loop_bytes > 2 ? loop : 0;
+    *loop_length = loop_bytes > 2 ? loop_bytes : 0;
+    return true;
+}
+
 int sd1_order_count(const Sd1Player* player) {
     return player->module.layout.position_count;
 }

@@ -450,13 +450,16 @@ static bool scm_check_tracker_data(const ScmModule* module, ScmCheck* check) {
     return true;
 }
 
-static bool scm_check_tracker(const ScmModule* module) {
+static bool scm_check_tracker(ScmModule* module) {
     ScmCheck* check = calloc(1, sizeof(*check));
     if (check == nullptr) {
         return false;
     }
     check->marks = calloc(1, module->size);
     const bool ok = check->marks != nullptr && scm_check_tracker_data(module, check);
+    if (ok) {
+        memcpy(module->instrument_used, check->used, sizeof(module->instrument_used));
+    }
     free(check->marks);
     free(check);
     return ok;

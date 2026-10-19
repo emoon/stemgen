@@ -479,6 +479,31 @@ const char* zm_instrument_name(const ZmPlayer* player, int instrument) {
     return player->module.instruments[instrument].name;
 }
 
+bool zm_instrument_pcm(const ZmPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    if (instrument < 0 || instrument >= ZM_LOADED_INSTRUMENTS) {
+        return false;
+    }
+    const ZmInstrument* ins = &player->module.instruments[instrument];
+    if (ins->sample == nullptr || ins->length == 0) {
+        return false;
+    }
+    *data = ins->sample;
+    *length = (uint32_t)ins->length * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a loop of one word is the "no loop" of the Amiga
+    const uint32_t start = (uint32_t)ins->loop_start * 2;
+    if (ins->loop_length > 1 && start < *length) {
+        *loop_start = start;
+        *loop_length = (uint32_t)ins->loop_length * 2;
+        if (*loop_length > *length - start) {
+            *loop_length = *length - start;
+        }
+    }
+    return true;
+}
+
 ZmPosition zm_position(const ZmPlayer* player) {
     const ZmSong* s = &player->song;
     return (ZmPosition) { .order = s->shown_position, .row = s->shown_row, .speed = player->module.speed };

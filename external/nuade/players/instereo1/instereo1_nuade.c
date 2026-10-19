@@ -131,6 +131,22 @@ static uint32_t instereo1_tracker_cells(void* user_data, const NuadePosition* at
                               user_data);
 }
 
+static uint32_t instereo1_sample_count(void* user_data) {
+    return (uint32_t)is1_instrument_count((const Is1Module*)user_data);
+}
+
+static bool instereo1_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!is1_instrument_pcm((const Is1Module*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_instereo1 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "instereo1",
@@ -147,6 +163,8 @@ const NuadePlayer nuade_player_instereo1 = {
     .voice_info = instereo1_voice_info,
     .tracker_info = instereo1_tracker_info,
     .tracker_cells = instereo1_tracker_cells,
+    .sample_count = instereo1_sample_count,
+    .sample_get = instereo1_sample_get,
 };
 
 Is1Module* is1_from_nuade(NuadeSong* song) {

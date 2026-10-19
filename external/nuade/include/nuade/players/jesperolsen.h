@@ -272,6 +272,20 @@ JoTickResult jo_tick(JoPlayer* player, NuadeVoices* voices);
 
 JoVoiceState jo_voice_state(const JoPlayer* player, int voice);
 
+// A sound of the module, as the replayer hands it to Paula: bytes in the module, with the loop inside them.
+typedef struct JoSound {
+    const int8_t* data;
+    uint32_t length;
+    uint32_t loop_start;
+    uint32_t loop_length; // 0: no loop
+} JoSound;
+
+// The instruments of the module, numbered as JoVoiceState.instrument. Replayer B keeps its instruments as programs of
+// sample blocks that no number names: it has none to count. Of an instrument with several waves or blocks, the first
+// one is the sound. False for an entry whose sound is not inside the module.
+uint32_t jo_instrument_count(const JoPlayer* player);
+bool jo_instrument_sound(const JoPlayer* player, uint32_t number, JoSound* out);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 JoPlayer* jo_from_nuade(NuadeSong* song);
 

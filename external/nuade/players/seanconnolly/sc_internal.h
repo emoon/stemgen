@@ -19,8 +19,11 @@
 #include <nuade/players/seanconnolly.h>
 
 #define SCO_MAX_MODULE_BYTES (4u << 20)
-#define SCO_SONG_BYTES 16u    // one subsong in the song table: the stream offset of each voice
-#define SCO_MAX_SUBSONGS 128u // the init routine of the sequencer build masks the subsong number with 0x7F
+#define SCO_INSTRUMENT_BYTES 16u
+#define SCO_MAX_INSTRUMENTS 256u // an instrument number is a byte
+#define SCO_LOOP_MIN 4u          // a repeat of this many bytes or less is no loop
+#define SCO_SONG_BYTES 16u       // one subsong in the song table: the stream offset of each voice
+#define SCO_MAX_SUBSONGS 128u    // the init routine of the sequencer build masks the subsong number with 0x7F
 // The raster position (VHPOSR word) the sample build reads for its noise seed at init, as UADE's harness runs it.
 #define SCO_V2_VHPOS 0x7F03u
 // The CIA-B time of day (low byte, counting raster lines) the sequencer build reads for its noise seed at init, as
@@ -71,6 +74,16 @@ typedef struct ScoSampleBounds {
 } ScoSampleBounds;
 
 ScoSampleBounds sco_sample_bounds(const ScoModule* module, uint32_t entry_offset);
+
+// The instrument records: the table runs up to the next table of the module (an instrument number is a byte).
+uint32_t sco_module_instrument_count(const ScoModule* module);
+
+// The sample of an instrument record, by family. `bytes` of data from module offset `from`, the loop `loop_bytes` long
+// at `loop_at` bytes into it (a loop of 4 bytes or less is none); false if the data is not inside the module.
+bool sco_pcm_make(const ScoModule* module, uint32_t from, uint32_t bytes, uint32_t loop_at, uint32_t loop_bytes,
+                  ScoPcm* out);
+bool sc2_instrument_pcm(const ScoModule* module, uint32_t instrument, ScoPcm* out);
+bool sc3_instrument_pcm(const ScoModule* module, uint32_t instrument, ScoPcm* out);
 
 // AUDxLC for an address of the module's space: bit 0 dropped as Paula does, inside the padded image.
 const int8_t* sco_chip(const ScoModule* module, uint32_t at);

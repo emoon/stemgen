@@ -208,6 +208,12 @@ MmdcPosition mmdc_position(const MmdcPlayer* player);
 bool mmdc_block_shape(const MmdcPlayer* player, uint32_t order, MmdcBlockShape* shape);
 MmdcCell mmdc_pattern_cell(const MmdcPlayer* player, uint32_t order, uint32_t voice, uint32_t line);
 
+// The instruments of the song (0-based, as MmdcVoiceState.instrument), their sample as the replayer hands it to
+// Paula: 8-bit data inside the player's module copy, its length in bytes, and the repeat in bytes (length 0: no loop).
+// False for an instrument without a sample.
+bool mmdc_sample_pcm(const MmdcPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                     uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 MmdcPlayer* mmdc_from_nuade(NuadeSong* song);
 

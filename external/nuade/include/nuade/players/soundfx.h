@@ -183,6 +183,9 @@ uint32_t sfx_pattern_rows(const SfxModule* module, int position);
 
 // Edit API
 int sfx_get_instrument_count(const SfxModule* module);
+// The PCM of a sample as the player hands it to the channel; false for an empty one.
+bool sfx_instrument_pcm(const SfxModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
 int sfx_get_num_patterns(const SfxModule* module);
 void sfx_get_cell(const SfxModule* module, int pattern, int row, int channel, uint16_t* period, uint8_t* sample,
                   uint8_t* effect, uint8_t* effect_arg);

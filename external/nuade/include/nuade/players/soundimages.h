@@ -304,6 +304,12 @@ SiTickResult si_tick(SiPlayer* player, NuadeVoices* voices);
 const char* si_format_name(const SiPlayer* player);
 SiVoiceState si_voice_state(const SiPlayer* player, uint32_t voice);
 
+// The entries of the sample table (the numbers the sample commands give) and the PCM of one, as the module holds it,
+// with the repeat when that lies in the same data. False for an empty entry.
+uint32_t si_sample_count(const SiPlayer* player);
+bool si_sample_pcm(const SiPlayer* player, uint32_t index, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SiPlayer* si_from_nuade(NuadeSong* song);
 

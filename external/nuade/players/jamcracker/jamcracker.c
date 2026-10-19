@@ -213,6 +213,23 @@ int jc_instrument_count(const JcPlayer* player) {
     return player->module.instrument_count;
 }
 
+bool jc_instrument_pcm(const JcPlayer* player, int instrument, const int8_t** data, uint32_t* length, bool* loops) {
+    if (instrument < 0 || instrument >= player->module.instrument_count) {
+        return false;
+    }
+    const JcInstrument* in = &player->module.instruments[instrument];
+    if ((in->flags & InstrumentFlag_Am) != 0) {
+        // The voices play windows built from the two stored source waves; the first one is the base wave.
+        *length = in->size != 0 ? WAVESIZE : 0;
+        *loops = true;
+    } else {
+        *length = in->size & ~1u;
+        *loops = (in->flags & InstrumentFlag_Loop) != 0;
+    }
+    *data = in->address;
+    return *length != 0;
+}
+
 const char* jc_instrument_name(const JcPlayer* player, int instrument) {
     if (instrument < 0 || instrument >= player->module.instrument_count) {
         return "";

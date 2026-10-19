@@ -681,3 +681,30 @@ McmdVoiceState mcmd_voice_state(const McmdPlayer* player, int voice) {
     return (McmdVoiceState) { .note = v->last_instrument >= 0 ? (v->note + v->note_transpose) & NOTE_MASK : -1,
                               .instrument = v->last_instrument };
 }
+
+int mcmd_sample_count(const McmdPlayer* player) {
+    const McmdModule* m = &player->module;
+    return (int)((m->sample_data - m->samples) / SAMPLE_SIZE);
+}
+
+bool mcmd_sample_pcm(const McmdPlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                     uint32_t* loop_length) {
+    const McmdModule* m = &player->module;
+    if (n < 0 || n >= mcmd_sample_count(player)) {
+        return false;
+    }
+    const SampleEntry e = sample_entry(m, (uint8_t)n);
+    const uint64_t start = (uint64_t)m->sample_data + e.offset;
+    const uint64_t bytes = 2u * (uint64_t)e.length;
+    if (bytes == 0 || start + bytes > m->size) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + start;
+    *length = (uint32_t)bytes;
+    // the repeat is the part [loop_start, loop_start + 2 * loop_length) of the sample; one word or less is none
+    const uint64_t loop_bytes = 2u * (uint64_t)e.loop_length;
+    const bool loops = loop_bytes > 2 && (uint64_t)e.loop_start + loop_bytes <= bytes;
+    *loop_start = loops ? e.loop_start : 0;
+    *loop_length = loops ? (uint32_t)loop_bytes : 0;
+    return true;
+}

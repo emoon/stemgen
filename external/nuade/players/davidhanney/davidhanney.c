@@ -565,3 +565,25 @@ int dh_pattern_rows(const DhPlayer* player, int order) {
 DhCell dh_pattern_cell(const DhPlayer* player, int order, int voice, int row) {
     return pattern_cell(player, sequence_pattern(player, (uint16_t)order), (uint16_t)row, voice);
 }
+
+bool dh_instrument_pcm(int inst, const int8_t** data, uint32_t* length, bool* loops) {
+    if (inst < 0 || inst >= DH_INSTRUMENTS) {
+        return false;
+    }
+    const DhInstrument* ins = &k_dh_instruments[inst];
+    if (ins->wave_kind != 0) {
+        uint16_t length_words;
+        *data = dh_builtin_wave(ins->wave_kind, &length_words);
+        *length = (uint32_t)length_words * 2;
+        *loops = false;
+        return true;
+    }
+    const uint32_t words = ins->length_words > MAX_WAVE_WORDS ? MAX_WAVE_WORDS : ins->length_words;
+    if (words == 0) {
+        return false;
+    }
+    *data = ins->wave;
+    *length = words * 2;
+    *loops = true;
+    return true;
+}

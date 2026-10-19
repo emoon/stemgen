@@ -25,6 +25,7 @@ extern "C" {
 // One player tick (DeliTracker's default 50 Hz CIA timer), in 1 / RR_TIMEBASE_HZ seconds.
 #define RR_TICK_LENGTH 14187
 
+#define RR_MAX_SAMPLE_INSTRUMENTS 256u // the instrument of a note is a byte
 #define RR_TITLE_BYTES 64
 #define RR_MAX_RANGES 12
 
@@ -196,6 +197,19 @@ bool rr_start(RrPlayer* player, uint32_t subsong, NuadeVoices* voices);
 RrTickResult rr_tick(RrPlayer* player, NuadeVoices* voices);
 
 RrVoiceState rr_voice_state(const RrPlayer* player, uint32_t voice);
+
+// The instruments the module defines (its sample pointer table runs up to the length table).
+uint32_t rr_instrument_count(const RrPlayer* player);
+
+// The sound of instrument `n` (0..255, the number a note selects): the sample the note starts and the loop that follows
+// it, when that lies in the same data. False for an instrument the module does not define.
+typedef struct RrInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = plays once
+} RrInstrumentPcm;
+bool rr_instrument_pcm(const RrPlayer* player, uint32_t n, RrInstrumentPcm* out);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 RrPlayer* rr_from_nuade(NuadeSong* song);

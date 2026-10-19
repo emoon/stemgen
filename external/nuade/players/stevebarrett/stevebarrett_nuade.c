@@ -69,6 +69,23 @@ static uint32_t stevebarrett_voice_info(void* user_data, NuadeVoiceInfo* out, ui
     return n;
 }
 
+static uint32_t stevebarrett_sample_count(void* user_data) {
+    return sbr_instrument_count((const SbrPlayer*)user_data);
+}
+
+static bool stevebarrett_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SbrPlayer* player = (const SbrPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!sbr_instrument_pcm(player, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_stevebarrett = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "stevebarrett",
@@ -82,6 +99,8 @@ const NuadePlayer nuade_player_stevebarrett = {
     .tick = stevebarrett_tick,
     .metadata = stevebarrett_metadata,
     .voice_info = stevebarrett_voice_info,
+    .sample_count = stevebarrett_sample_count,
+    .sample_get = stevebarrett_sample_get,
 };
 
 SbrPlayer* sbr_from_nuade(NuadeSong* song) {

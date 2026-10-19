@@ -80,6 +80,21 @@ static uint32_t markii_grid_ticks(void* user_data, uint32_t subsong) {
     return mk2_grid_ticks((const Mk2Player*)user_data);
 }
 
+static uint32_t markii_sample_count(void* user_data) {
+    return mk2_instrument_count((const Mk2Player*)user_data);
+}
+
+static bool markii_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!mk2_instrument_pcm((const Mk2Player*)user_data, n, &data, &length)) {
+        return false;
+    }
+    // the replayer never sets a repeat, so Paula plays the whole sound again and again
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8, .loop_frames = length };
+    return true;
+}
+
 const NuadePlayer nuade_player_markii = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "markii",
@@ -94,6 +109,8 @@ const NuadePlayer nuade_player_markii = {
     .metadata = markii_metadata,
     .voice_info = markii_voice_info,
     .grid_ticks = markii_grid_ticks,
+    .sample_count = markii_sample_count,
+    .sample_get = markii_sample_get,
 };
 
 Mk2Player* mk2_from_nuade(NuadeSong* song) {

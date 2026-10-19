@@ -75,6 +75,23 @@ static uint32_t steveturner_grid_ticks(void* user_data, uint32_t subsong) {
     return st_grid_ticks((const StPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t steveturner_sample_count(void* user_data) {
+    return st_instrument_count((const StPlayer*)user_data);
+}
+
+static bool steveturner_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const StPlayer* player = (const StPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!st_instrument_pcm(player, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_steveturner = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "steveturner",
@@ -89,6 +106,8 @@ const NuadePlayer nuade_player_steveturner = {
     .metadata = steveturner_metadata,
     .voice_info = steveturner_voice_info,
     .grid_ticks = steveturner_grid_ticks,
+    .sample_count = steveturner_sample_count,
+    .sample_get = steveturner_sample_get,
 };
 
 StPlayer* st_from_nuade(NuadeSong* song) {

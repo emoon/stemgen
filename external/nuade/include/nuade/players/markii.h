@@ -134,6 +134,11 @@ uint32_t mk2_grid_ticks(const Mk2Player* player);
 
 Mk2VoiceState mk2_voice_state(const Mk2Player* player, uint32_t voice);
 
+// The instrument table: each entry is one 8-bit PCM sound the replayer starts as it is (the channel repeats all of it,
+// as Paula does when nothing sets a repeat). False for an empty instrument (none or one word) or one outside the module.
+uint32_t mk2_instrument_count(const Mk2Player* player);
+bool mk2_instrument_pcm(const Mk2Player* player, uint32_t n, const int8_t** data, uint32_t* length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 Mk2Player* mk2_from_nuade(NuadeSong* song);
 

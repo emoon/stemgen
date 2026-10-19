@@ -202,6 +202,16 @@ const char* qc_title(const QcModule* module);
 // Sample name by slot (0-based); empty when the slot is unused.
 const char* qc_sample_name(const QcModule* module, int index);
 
+// The PCM of sample slot `index` (0-based; the sample number is index + 1), as far as the player plays it: up to the
+// end of its loop. False for an empty slot.
+typedef struct QcSamplePcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;
+    uint32_t loop_frames; // 0 = no loop
+} QcSamplePcm;
+bool qc_sample_pcm(const QcModule* module, int index, QcSamplePcm* out);
+
 // Edit API
 int qc_get_instrument_count(const QcModule* module);
 int qc_get_num_patterns(const QcModule* module);

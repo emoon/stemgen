@@ -119,6 +119,15 @@ QtTickResult qt_tick(QtPlayer* player, NuadeVoices* voices);
 uint32_t qt_tempo(const QtPlayer* player);
 QtVoiceState qt_voice_state(const QtPlayer* player, uint32_t voice);
 
+// The sound of sample `n` (0..QT_SAMPLES - 1, the number the notes use) in the sample set, as a note plays it. A
+// looping sample repeats whole.
+typedef struct QtSamplePcm {
+    const int8_t* data;
+    uint32_t frames;
+    bool loops;
+} QtSamplePcm;
+bool qt_sample_pcm(const QtPlayer* player, uint32_t n, QtSamplePcm* out);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 QtPlayer* qt_from_nuade(NuadeSong* song);
 

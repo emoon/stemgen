@@ -284,3 +284,25 @@ EaVoiceState ea_voice_state(const EaPlayer* player, int voice) {
     const EaVoice* v = &player->voices[voice];
     return (EaVoiceState) { .period = v->instrument >= 0 ? ea_period_entry(v->note) : 0, .instrument = v->instrument };
 }
+
+uint32_t ea_sound_count(const EaPlayer* player) {
+    return ea_instrument_count(&player->module);
+}
+
+bool ea_sound_pcm(const EaPlayer* player, uint32_t instrument, const int8_t** data, uint32_t* bytes, bool* loops) {
+    if (instrument >= ea_instrument_count(&player->module)) {
+        return false;
+    }
+    const EaInstrument in = ea_instrument(&player->module, instrument);
+    const EaSample sample = ea_sample(&player->module, in.sample);
+    const uint64_t length = (sample.length_words != 0 ? (uint64_t)sample.length_words : 65536u) * 2u;
+    if (sample.data == nullptr
+        || (uint64_t)((const uint8_t*)sample.data - player->module.bytes) + length > player->module.size) {
+        return false;
+    }
+    *data = sample.data;
+    *bytes = (uint32_t)length;
+    // a gate of 0 plays the sample once; any other gate keeps the voice repeating the whole sample until it closes
+    *loops = in.gate_ticks != 0;
+    return true;
+}

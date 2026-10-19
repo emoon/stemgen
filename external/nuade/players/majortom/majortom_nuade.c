@@ -129,6 +129,23 @@ static uint32_t majortom_tracker_cells(void* user_data, const NuadePosition* at,
     return nuade_tracker_fill(at, MT_VOICES, MT_ROWS, channel, row_lo, row_hi, out, cap, majortom_cell, user_data);
 }
 
+static uint32_t majortom_sample_count(void* user_data) {
+    (void)user_data;
+    return MT_WAVEFORM_COUNT;
+}
+
+static bool majortom_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const MtPlayer* player = (const MtPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames;
+    if (n >= MT_WAVEFORM_COUNT || !mt_waveform_pcm(&player->module, (uint8_t)n, &data, &frames)) {
+        return false;
+    }
+    // a waveform is one cycle that Paula repeats
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = frames, .bits = 8, .loop_frames = frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_majortom = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "majortom",
@@ -145,6 +162,8 @@ const NuadePlayer nuade_player_majortom = {
     .voice_info = majortom_voice_info,
     .tracker_info = majortom_tracker_info,
     .tracker_cells = majortom_tracker_cells,
+    .sample_count = majortom_sample_count,
+    .sample_get = majortom_sample_get,
 };
 
 MtPlayer* mt_from_nuade(NuadeSong* song) {

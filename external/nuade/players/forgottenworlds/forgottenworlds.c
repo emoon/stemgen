@@ -33,7 +33,8 @@
 // Guards: commands one voice may read in a tick (the original loops for ever on a stream without a note or a rest).
 #define COMMANDS_PER_TICK 4096
 
-#define INSTRUMENT_SIZE 8 // the instrument number is a multiple of this
+#define MAX_INSTRUMENTS 128 // numbers are signed bytes, and the sample table is addressed from the low byte
+#define INSTRUMENT_SIZE 8   // the instrument number is a multiple of this
 #define SAMPLE_BYTE_MASK 0xFF
 #define PATTERN_ENTRY_SIZE 2
 
@@ -231,18 +232,22 @@ static StepResult start_note(const FwModule* m, FwVoice* v, uint8_t note, uint32
     return StepResult_Done;
 }
 
-// The instrument command: the instrument number (a signed byte), then the sample it names. The instrument number's
-// word (number * 8) keeps its high byte when the sample offset byte is loaded, so numbers of 32 and above add it to
-// the sample offset.
+// The records instrument `number` (a signed byte) names. The instrument number's word (number * 8) keeps its high byte
+// when the sample offset byte is loaded, so numbers of 32 and above add it to the sample offset.
+static void read_instrument_sample(const FwModule* m, int8_t number, FwInstrument* instrument, FwSample* sample) {
+    const int16_t table_offset = (int16_t)(number * INSTRUMENT_SIZE);
+    *instrument = read_instrument(m, m->instruments + (uint32_t)(int32_t)table_offset);
+    const int16_t sample_offset = (int16_t)((table_offset & ~SAMPLE_BYTE_MASK) | instrument->sample);
+    *sample = read_sample(m, m->samples + (uint32_t)(int32_t)sample_offset);
+}
+
+// The instrument command: the instrument number (a signed byte), then the sample it names.
 static void select_instrument(FwPlayer* p, FwVoice* v, uint32_t* pos) {
     const FwModule* m = &p->module;
     const int8_t number = (int8_t)module_u8(m, (*pos)++);
-    const int16_t table_offset = (int16_t)(number * INSTRUMENT_SIZE);
     v->has_instrument = true;
     v->instrument_number = number;
-    v->instrument = read_instrument(m, m->instruments + (uint32_t)(int32_t)table_offset);
-    const int16_t sample_offset = (int16_t)((table_offset & ~SAMPLE_BYTE_MASK) | v->instrument.sample);
-    v->sample = read_sample(m, m->samples + (uint32_t)(int32_t)sample_offset);
+    read_instrument_sample(m, number, &v->instrument, &v->sample);
     p->end_target_known = true;
     p->end_target = v->sample.loop;
 }
@@ -373,4 +378,45 @@ void fw_start(FwPlayer* player, NuadeVoices* voices) {
 FwVoiceState fw_voice_state(const FwPlayer* player, int voice) {
     const FwVoice* v = &player->voices[voice];
     return (FwVoiceState) { .note = v->shown_note, .instrument = v->instrument_number };
+}
+
+uint32_t fw_instrument_count(const FwPlayer* player) {
+    const FwModule* m = &player->module;
+    const uint32_t count = m->samples > m->instruments ? (m->samples - m->instruments) / INSTRUMENT_SIZE : 0;
+    return count < MAX_INSTRUMENTS ? count : MAX_INSTRUMENTS;
+}
+
+bool fw_instrument_pcm(const FwPlayer* player, uint32_t number, const int8_t** data, uint32_t* bytes,
+                       uint32_t* loop_start, uint32_t* loop_bytes) {
+    if (number >= fw_instrument_count(player)) {
+        return false;
+    }
+    // the file as loaded: the end command changes the playing copy
+    const FwModule* m = &player->module;
+    FwInstrument instrument;
+    FwSample sample;
+    read_instrument_sample(m, (int8_t)number, &instrument, &sample);
+    if (sample.words == 0 || sample.start >= m->size) {
+        return false;
+    }
+    // what lies beyond the end of the file is silence
+    uint32_t length = (uint32_t)sample.words * 2;
+    length = length < m->size - sample.start ? length : (uint32_t)m->size - sample.start;
+    *loop_start = 0;
+    *loop_bytes = 0;
+    // The sample plays once, then its repeat block. It is one sound with a loop when the block lies in or directly
+    // after the first run.
+    if (sample.loop_words > 1 && sample.loop >= sample.start && sample.loop - sample.start <= length) {
+        const uint32_t block = (uint32_t)sample.loop_words * 2;
+        const uint32_t end = sample.loop - sample.start + block;
+        *loop_start = sample.loop - sample.start;
+        *loop_bytes = block;
+        if (end > length) {
+            length = end <= m->size - sample.start ? end : (uint32_t)m->size - sample.start;
+            *loop_bytes = length - *loop_start;
+        }
+    }
+    *data = (const int8_t*)m->original + sample.start;
+    *bytes = length;
+    return true;
 }

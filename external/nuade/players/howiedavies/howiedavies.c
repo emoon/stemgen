@@ -462,6 +462,35 @@ uint32_t hd_grid_ticks(const HdPlayer* player) {
     return HD_DEFAULT_SPEED;
 }
 
+uint32_t hd_sample_count(const HdPlayer* player) {
+    return player->module.sample_count;
+}
+
+bool hd_sample_pcm(const HdPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames) {
+    HdSample sample;
+    // record 0 is the silence the eagleplayer puts there
+    if (n == 0 || !hd_sample(&player->module, n, &sample) || sample.words == 0) {
+        return false;
+    }
+    *data = sample.start;
+    *frames = (uint32_t)sample.words * 2;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The repeat is a place of its own; it can be shown as a loop only where it lies inside the sample.
+    const uintptr_t start = (uintptr_t)sample.start;
+    const uintptr_t repeat = (uintptr_t)sample.loop;
+    if (player->module.driver->loop_from_instrument && sample.loop_words > 1 && repeat >= start
+        && repeat - start < *frames) {
+        *loop_start = (uint32_t)(repeat - start);
+        *loop_frames = (uint32_t)sample.loop_words * 2;
+        if (*loop_frames > *frames - *loop_start) {
+            *loop_frames = *frames - *loop_start;
+        }
+    }
+    return true;
+}
+
 HdVoiceState hd_voice_state(const HdPlayer* player, uint32_t voice) {
     const HdVoice* v = &player->voices[voice];
     return (HdVoiceState) { .period = v->paula.period, .instrument = v->instrument };

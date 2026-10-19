@@ -15,6 +15,7 @@
 #include "nuade_base.h"
 #include "nuade_file_index.h"
 #include "nuade_path.h"
+#include "nuade_paula.h"
 #include "nuade_paula_channel.h"
 #include "nuade_utils.h"
 #include <stdio.h>
@@ -849,6 +850,43 @@ const char* cw_instrument_name(const CwPlayer* player, int instrument) {
         }
     }
     return "";
+}
+
+bool cw_zone_pcm(const CwPlayer* player, int block, int zone, CwZonePcm* out) {
+    const CwModule* m = &player->module;
+    if (block < 0 || block >= m->instrument_count || zone < 0 || zone >= CW_ZONES_PER_INSTRUMENT) {
+        return false;
+    }
+    const CwInstrument* ins = &m->instruments[block];
+    if (program_instrument(m, ins->program) != ins) {
+        return false;
+    }
+    const CwZone* z = &ins->zones[zone];
+    const int32_t first = z->start / 2 * 2;
+    const int32_t words = (int32_t)((uint32_t)z->end - (uint32_t)z->start) / 2;
+    if (!z->has_sample || z->data == nullptr || z->period == 0 || first < 0 || words <= 0
+        || (uint32_t)first + (uint32_t)words * 2 > z->size) {
+        return false;
+    }
+    const uint32_t length = (uint32_t)words * 2;
+    uint32_t loop_start = 0;
+    uint32_t loop_length = 0;
+    if (z->loop >= first && z->end > z->loop) {
+        // the repeat plays loop..end; a length of two bytes is the silence of a one-shot
+        const uint32_t loop_first = (uint32_t)(z->loop / 2 * 2) - (uint32_t)first;
+        if ((uint32_t)(z->end - z->loop) / 2 * 2 > 2 && loop_first < length) {
+            loop_start = loop_first;
+            loop_length = length - loop_first;
+        }
+    }
+    *out = (CwZonePcm) { .program = ins->program,
+                         .name = z->name,
+                         .data = z->data + first,
+                         .length = length,
+                         .loop_start = loop_start,
+                         .loop_length = loop_length,
+                         .rate = (uint32_t)(NUADE_PAULA_CLOCK_PAL / z->period) };
+    return true;
 }
 
 CwVoiceState cw_voice_state(const CwPlayer* player, int voice) {

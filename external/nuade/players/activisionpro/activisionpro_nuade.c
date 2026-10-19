@@ -64,6 +64,23 @@ static uint32_t activisionpro_grid_ticks(void* user_data, uint32_t subsong) {
     return avp_ticks_per_step((const AvpModule*)user_data, (int)subsong);
 }
 
+static uint32_t activisionpro_sample_count(void* user_data) {
+    return (uint32_t)avp_sample_count((const AvpModule*)user_data);
+}
+
+// Entry n is instrument n, the number the voice info reports; instruments share samples, so a sample can come twice.
+static bool activisionpro_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!avp_sample_pcm((const AvpModule*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_activisionpro = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "activisionpro",
@@ -78,6 +95,8 @@ const NuadePlayer nuade_player_activisionpro = {
     .metadata = activisionpro_metadata,
     .voice_info = activisionpro_voice_info,
     .grid_ticks = activisionpro_grid_ticks,
+    .sample_count = activisionpro_sample_count,
+    .sample_get = activisionpro_sample_get,
 };
 
 AvpModule* avp_from_nuade(NuadeSong* song) {

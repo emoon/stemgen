@@ -316,7 +316,7 @@ static bool st_walk_track(StWalk* w, uint32_t start) {
     return start < m->size; // a list that runs to the end of the module reads 0 (pattern 0) from there
 }
 
-static bool st_reachable_valid(const StModule* m) {
+static bool st_reachable_valid(StModule* m) {
     StWalk* w = calloc(1, sizeof(StWalk));
     const size_t bitmap_bytes = (size_t)m->size / 8 + 1;
     uint8_t* bitmaps = calloc(2, bitmap_bytes);
@@ -333,6 +333,9 @@ static bool st_reachable_valid(const StModule* m) {
             for (int i = 0; valid && i < ST_VOICES; i++) {
                 valid = song.track[i] == 0 || st_walk_track(w, st_add_s16(m->songs, (int16_t)song.track[i]));
             }
+        }
+        for (int index = 0; index < ST_MAX_INSTRUMENTS; index++) {
+            m->instrument_used[index] = w->instrument_done[index + ST_INSTRUMENT_INDEX_BIAS];
         }
     }
     free(bitmaps);
@@ -907,6 +910,43 @@ uint32_t st_grid_ticks(const StPlayer* player, int subsong) {
         return 0;
     }
     return st_read_song(&player->module, (uint8_t)(subsong + 1)).speed;
+}
+
+uint32_t st_instrument_count(const StPlayer* player) {
+    uint32_t count = 0;
+    for (uint32_t index = 0; index < ST_MAX_INSTRUMENTS; index++) {
+        if (player->module.instrument_used[index]) {
+            count = index + 1;
+        }
+    }
+    return count;
+}
+
+bool st_instrument_pcm(const StPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames) {
+    const StModule* m = &player->module;
+    // Only the instruments the song can start (from a pattern or by a chain) are records; the rest is other data.
+    if (inst >= st_instrument_count(player) || !m->instrument_used[inst]) {
+        return false;
+    }
+    const StInstrument instrument = st_read_instrument(m, (uint16_t)(inst * ST_INSTRUMENT_BYTES));
+    uint32_t at;
+    if (instrument.sample >= 0x80 || !st_sample_at(m, instrument.sample, &at)) {
+        return false;
+    }
+    uint32_t length = st_u16(m, at);
+    if (length > m->size - at - 2) {
+        length = m->size - at - 2;
+    }
+    if (length == 0) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + at + 2;
+    *frames = length;
+    // A sound with passes of the envelope repeats the whole sample; one without is cut off after its first play.
+    *loop_start = 0;
+    *loop_frames = instrument.repeats != 0 ? length : 0;
+    return true;
 }
 
 StVoiceState st_voice_state(const StPlayer* player, int voice) {

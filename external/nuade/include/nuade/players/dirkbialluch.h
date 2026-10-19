@@ -58,13 +58,15 @@ typedef struct DbModule {
     uint32_t pattern_data;
     uint32_t program_table; // MPRG: word offsets
     uint32_t program_data;
-    uint32_t groove;   // MGRV data
-    uint32_t arpeggio; // MARP data
+    uint32_t program_count; // program numbers 0 .. program_count - 1 have a table entry
+    uint32_t groove;        // MGRV data
+    uint32_t arpeggio;      // MARP data
     uint32_t subsong_count;
     const uint8_t* samples; // the sample file and NUADE_PAULA_MAX_SAMPLE_BYTES zero bytes (nuade_paula_padded_copy)
     uint32_t samples_size;  // the sample file's size
     uint32_t sample_table;  // MSMP: long offsets
     uint32_t sample_data;
+    uint32_t sample_count; // sample numbers 0 .. sample_count - 1 have a table entry
 } DbModule;
 
 typedef struct DbVoice {
@@ -136,6 +138,12 @@ DbTickResult db_tick(DbPlayer* player, NuadeVoices* voices);
 uint32_t db_grid_ticks(const DbPlayer* player);
 
 DbVoiceState db_voice_state(const DbPlayer* player, int voice);
+
+// The sound a program (1 .. db_program_count - 1) starts: the sample its sample commands select (moved by their
+// additions), up to the first length command that gives a length (without one, up to the next sample of the table).
+// False for a program that selects no sample inside the sample file.
+int db_program_count(const DbPlayer* player);
+bool db_program_pcm(const DbPlayer* player, int program, const int8_t** data, uint32_t* length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 DbPlayer* db_from_nuade(NuadeSong* song);

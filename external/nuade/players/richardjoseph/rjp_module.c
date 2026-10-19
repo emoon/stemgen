@@ -20,7 +20,6 @@
 #define SUBSONG_MASK 0x3F // the replayer starts subsong `n & 0x3F`
 #define ENVELOPE_BLOCK_SIZE 6
 #define PATTERN_ENTRY_SIZE 4
-#define MAX_INSTRUMENTS 256        // an instrument number is a byte
 #define MAX_SAMPLE_END (16u << 20) // a sample beyond the 68000's address space is no sample
 
 #define MODULE_PREFIX "rjp."
@@ -185,7 +184,7 @@ static void repair_known_modules(RjpModule* module) {
 static uint64_t samples_end(const RjpModule* module, uint32_t file_size) {
     uint64_t end = file_size;
     const uint32_t count = module->instruments.size / RJP_INSTRUMENT_SIZE;
-    for (uint32_t i = 0; i < count && i < MAX_INSTRUMENTS; i++) {
+    for (uint32_t i = 0; i < count && i < RJP_MAX_INSTRUMENTS; i++) {
         const RjpInstrument in = rjp_read_instrument(module, (uint8_t)i);
         // AUDxLEN 0 plays 65536 words
         const uint32_t attack_words = in.attack_words != 0 ? in.attack_words : RJP_ZERO_LENGTH_WORDS;

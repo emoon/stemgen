@@ -193,6 +193,11 @@ int tme_order_count(const TmePlayer* player);
 TmeVoiceState tme_voice_state(const TmePlayer* player, int voice);
 
 // An order, voice or row out of range reads as an empty cell.
+// The sample of an instrument (0-based) as the replayer hands it to Paula: 8-bit data inside the player's module copy,
+// its length in bytes, and the repeat in bytes (length 0: no loop). False for an instrument without a sample.
+bool tme_instrument_pcm(const TmePlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
+
 TmeCell tme_pattern_cell(const TmePlayer* player, uint32_t order, uint32_t voice, uint32_t row);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

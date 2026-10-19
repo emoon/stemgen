@@ -274,6 +274,32 @@ uint32_t sj_ticks_per_row(void) {
     return TICKS_PER_ROW;
 }
 
+bool sj_instrument_pcm(const SjPlayer* player, uint32_t slot, SjInstrumentPcm* out) {
+    if (slot >= SJ_INSTRUMENT_SLOTS) {
+        return false;
+    }
+    const SjSampleSlot* s = &player->samples.slots[slot];
+    const SjSamples* samples = &player->samples;
+    if (s->length_words == 0 && s->loop_length_words == 0) {
+        return false; // a slot the song's files do not fill
+    }
+    // the one-shot part, then the loop that follows it in the 8SVX body
+    uint64_t end = s->start + (uint64_t)s->length_words * 2;
+    const bool loops = s->loop_length_words != 0 && s->loop_start >= s->start;
+    const uint64_t loop_end = s->loop_start + (uint64_t)s->loop_length_words * 2;
+    if (loops && loop_end > end) {
+        end = loop_end;
+    }
+    if (end > samples->arena_size || end == s->start) {
+        return false;
+    }
+    *out = (SjInstrumentPcm) { .data = (const int8_t*)samples->arena + s->start,
+                               .frames = (uint32_t)(end - s->start),
+                               .loop_start = loops ? s->loop_start - s->start : 0,
+                               .loop_frames = loops ? (uint32_t)s->loop_length_words * 2 : 0 };
+    return true;
+}
+
 SjVoiceState sj_voice_state(const SjPlayer* player, uint32_t voice) {
     if (voice >= SJ_VOICES) {
         return (SjVoiceState) { .period = 0, .instrument = -1 };

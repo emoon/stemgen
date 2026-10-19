@@ -66,6 +66,22 @@ static uint32_t beathoven_grid_ticks(void* user_data, uint32_t subsong) {
     return bth_ticks_per_step((const BthPlayer*)user_data, subsong);
 }
 
+static uint32_t beathoven_sample_count(void* user_data) {
+    return bth_sample_count((const BthPlayer*)user_data);
+}
+
+static bool beathoven_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!bth_sample_pcm((const BthPlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_beathoven = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "beathoven",
@@ -80,6 +96,8 @@ const NuadePlayer nuade_player_beathoven = {
     .metadata = beathoven_metadata,
     .voice_info = beathoven_voice_info,
     .grid_ticks = beathoven_grid_ticks,
+    .sample_count = beathoven_sample_count,
+    .sample_get = beathoven_sample_get,
 };
 
 BthPlayer* bth_from_nuade(NuadeSong* song) {

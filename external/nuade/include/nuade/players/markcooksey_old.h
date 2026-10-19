@@ -127,6 +127,10 @@ McoTickResult mco_tick(McoPlayer* player, NuadeVoices* voices);
 
 McoVoiceState mco_voice_state(const McoPlayer* player, int voice);
 
+// The sounds of the sample table, numbered as McoVoiceState.instrument. A sample is 8-bit PCM that plays once.
+int mco_sample_count(const McoPlayer* player);
+bool mco_sample_pcm(const McoPlayer* player, int n, const int8_t** data, uint32_t* length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 McoPlayer* mco_from_nuade(NuadeSong* song);
 

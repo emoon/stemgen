@@ -752,6 +752,26 @@ int sfx_get_instrument_count(const SfxModule* module) {
     return module ? 31 : 0;
 }
 
+bool sfx_instrument_pcm(const SfxModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= SFX_INSTRUMENTS)
+        return false;
+    const SfxSample* s = &module->samples[inst];
+    if (s->sample_addr == nullptr || s->length == 0)
+        return false;
+    *data = s->sample_addr;
+    *length = s->length;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a loop of 2 bytes or less is the "no loop" of the format; a real loop ends the sound at its end
+    if (s->loop_length > 2) {
+        *loop_start = s->loop_start;
+        *loop_length = s->loop_length;
+        *length = s->loop_start + s->loop_length;
+    }
+    return true;
+}
+
 int sfx_get_num_patterns(const SfxModule* module) {
     return module ? (int)(module->max_pattern + 1) : 0;
 }

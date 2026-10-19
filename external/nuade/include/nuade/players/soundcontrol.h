@@ -249,6 +249,9 @@ ScVoiceState sc_voice_state(const ScModule* module, int channel);
 // Edit API
 int sc_get_instrument_count(const ScModule* module);
 int sc_get_num_samples(const ScModule* module);
+// The PCM of sample `n` (0 to sc_get_num_samples - 1); false for an empty slot. Loop in bytes, 0 length for none.
+bool sc_sample_pcm(const ScModule* module, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
 float sc_get_instrument_param(const ScModule* module, int inst, const char* param);
 void sc_set_instrument_param(ScModule* module, int inst, const char* param, float value);
 size_t sc_export(const ScModule* module, uint8_t* out, size_t max_size);

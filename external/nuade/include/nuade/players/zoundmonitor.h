@@ -156,6 +156,10 @@ ZmTickResult zm_tick(ZmPlayer* player, NuadeVoices* voices);
 
 // 0-based; the instrument's name (its sample file name), "" when unused or out of range.
 const char* zm_instrument_name(const ZmPlayer* player, int instrument);
+// The PCM of instrument `instrument` (0-based, as NuadeVoiceInfo.instrument) as the replayer hands it to Paula. Lengths
+// and loop in bytes. False for an instrument without a loaded sample.
+bool zm_instrument_pcm(const ZmPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
 
 // The row decoded by the last row tick (position 0, row 0 before the first one).
 ZmPosition zm_position(const ZmPlayer* player);

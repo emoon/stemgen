@@ -127,6 +127,12 @@ MtTickResult mt_tick(MtPlayer* player, NuadeVoices* voices);
 
 // The row the next row tick decodes.
 MtPosition mt_position(const MtPlayer* player);
+
+// The number of waveforms the module's waveform table can hold; waveform `number` is what the waveform sequences select.
+#define MT_WAVEFORM_COUNT 240
+// The 32-byte single cycle waveform `number`; false when it is all zero (unused) or outside the table. The noise
+// waveform is the replayer's own table, not the song's, and is not a waveform here.
+bool mt_waveform_pcm(const MtModule* module, uint8_t number, const int8_t** data, uint32_t* frames);
 int mt_order_count(const MtPlayer* player);
 
 MtVoiceState mt_voice_state(const MtPlayer* player, int voice);

@@ -84,6 +84,25 @@ static uint32_t silmarils_grid_ticks(void* user_data, uint32_t subsong) {
     return sil_grid_ticks((const SilPlayer*)user_data, subsong);
 }
 
+static uint32_t silmarils_sample_count(void* user_data) {
+    return sil_slot_count((const SilPlayer*)user_data);
+}
+
+static bool silmarils_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sil_slot_pcm((const SilPlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_silmarils = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "silmarils",
@@ -95,6 +114,8 @@ const NuadePlayer nuade_player_silmarils = {
     .close = silmarils_close,
     .start = silmarils_start,
     .tick = silmarils_tick,
+    .sample_count = silmarils_sample_count,
+    .sample_get = silmarils_sample_get,
     .metadata = silmarils_metadata,
     .voice_info = silmarils_voice_info,
     .grid_ticks = silmarils_grid_ticks,

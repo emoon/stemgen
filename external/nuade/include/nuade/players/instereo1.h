@@ -240,6 +240,11 @@ Is1Position is1_position(const Is1Module* module);
 int is1_position_count(const Is1Module* module);
 // Rows per position of the subsong until a track length effect changes it.
 int is1_default_rows(const Is1Module* module);
+// The PCM of an instrument (inst 0 .. is1_instrument_count - 1; the number the voices report): the window of its
+// sample, or for a synth instrument the stored waveform. False for an instrument without data.
+int is1_instrument_count(const Is1Module* module);
+bool is1_instrument_pcm(const Is1Module* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
 Is1VoiceState is1_voice_state(const Is1Module* module, int voice);
 // The line of `channel` at `row` of `position`; all 0 outside the song.
 Is1Cell is1_pattern_cell(const Is1Module* module, int position, int channel, int row);

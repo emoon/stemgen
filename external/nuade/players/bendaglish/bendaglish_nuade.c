@@ -87,6 +87,22 @@ static uint32_t bendaglish_voice_info(void* user_data, NuadeVoiceInfo* out, uint
     return count < cap ? count : cap;
 }
 
+static uint32_t bendaglish_sample_count(void* user_data) {
+    return bd_sample_count(((BendaglishNuade*)user_data)->module);
+}
+
+static bool bendaglish_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!bd_sample_pcm(((BendaglishNuade*)user_data)->module, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_bendaglish = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "bendaglish",
@@ -101,6 +117,8 @@ const NuadePlayer nuade_player_bendaglish = {
     .metadata = bendaglish_metadata,
     .voice_info = bendaglish_voice_info,
     .grid_ticks = bendaglish_grid_ticks,
+    .sample_count = bendaglish_sample_count,
+    .sample_get = bendaglish_sample_get,
 };
 
 BdModule* bd_from_nuade(NuadeSong* song) {

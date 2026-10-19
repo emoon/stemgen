@@ -25,6 +25,7 @@ typedef struct PatternInfo {
 
 typedef struct Walk {
     const MonModule* module;
+    uint32_t instrument_count; // one past the highest instrument command argument
     uint8_t* patterns;      // a bit per address: the pattern starting there has been walked
     uint8_t* pattern_ticks; // a bit per address: ... and ends a tick
     uint32_t* stamps;       // per sequence word: the sequence it was read in last
@@ -72,6 +73,9 @@ static PatternInfo walk_pattern(Walk* walk, uint32_t start) {
             return (PatternInfo) { .valid = true, .ends_tick = ticks };
         }
         ticks = ticks || ends_tick(command);
+        if (command == MonPatternCommand_Instrument && at + 1 < m->size && mon_u8(m, at + 1) >= walk->instrument_count) {
+            walk->instrument_count = (uint32_t)mon_u8(m, at + 1) + 1;
+        }
         const uint32_t next = at + 1 + mon_pattern_arguments(command);
         if (next > m->size) {
             return (PatternInfo) { 0 };
@@ -216,7 +220,7 @@ static bool first_tick(const MonModule* m, const MonSong* song) {
     return true;
 }
 
-bool mon_walk_songs(const MonModule* m) {
+bool mon_walk_songs(MonModule* m) {
     if (m->size > MAX_IMAGE_BYTES) {
         return false;
     }
@@ -237,6 +241,7 @@ bool mon_walk_songs(const MonModule* m) {
         }
         ok = ok && first_tick(m, &song);
     }
+    m->instrument_count = walk.instrument_count;
     free(walk.patterns);
     free(walk.pattern_ticks);
     free(walk.stamps);

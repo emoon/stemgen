@@ -62,6 +62,22 @@ static uint32_t markcooksey_voice_info(void* user_data, NuadeVoiceInfo* out, uin
     return n;
 }
 
+static uint32_t markcooksey_sample_count(void* user_data) {
+    return mc_instrument_count((const McPlayer*)user_data);
+}
+
+static bool markcooksey_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!mc_instrument_pcm((const McPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 static uint32_t markcooksey_grid_ticks(void* user_data, uint32_t subsong) {
     (void)user_data;
     (void)subsong;
@@ -81,6 +97,8 @@ const NuadePlayer nuade_player_markcooksey = {
     .tick = markcooksey_tick,
     .metadata = markcooksey_metadata,
     .voice_info = markcooksey_voice_info,
+    .sample_count = markcooksey_sample_count,
+    .sample_get = markcooksey_sample_get,
     .grid_ticks = markcooksey_grid_ticks,
 };
 

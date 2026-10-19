@@ -159,6 +159,29 @@ static void sonix_metadata(void* user_data, const NuadeMetadataSink* sink) {
     }
 }
 
+static uint32_t sonix_sample_count(void* user_data) {
+    (void)user_data;
+    return SONIX_INSTRUMENTS;
+}
+
+static bool sonix_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SonixSong* song = ((const SonixNuade*)user_data)->song;
+    SonixInstrumentPcm pcm;
+    if (n >= SONIX_INSTRUMENTS || !sonix_song_instrument_pcm(song, (uint8_t)n, &pcm)) {
+        return false;
+    }
+    const char* name = sonix_song_get_instrument_name(song, (uint8_t)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .rate = pcm.rate,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 static bool sonix_dump_state(void* user_data, const char* path) {
     return sonix_set_dump_file(((SonixNuade*)user_data)->song, path);
 }
@@ -188,4 +211,6 @@ const NuadePlayer nuade_player_sonix = {
     .voice_info = sonix_voice_info,
     .events = sonix_events,
     .dump_state = sonix_dump_state,
+    .sample_count = sonix_sample_count,
+    .sample_get = sonix_sample_get,
 };

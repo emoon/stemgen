@@ -101,6 +101,7 @@ typedef struct ScmModule {
     uint32_t envelopes;
     uint32_t events[SCM_TRACKS];
     int16_t zero_write; // displacement from the note's sample start
+    bool instrument_used[SCM_MAX_INSTRUMENTS]; // some event of the tracks starts the instrument (tracker drivers)
 } ScmModule;
 
 typedef struct ScmBounce {
@@ -157,6 +158,13 @@ bool scumm_start(ScummPlayer* player);
 void scumm_tick(ScummPlayer* player, NuadeVoices* voices);
 
 ScummVoiceState scumm_voice_state(const ScummPlayer* player, uint32_t voice);
+
+// The instruments of a tracker driver (0 for the sweep effects) and the PCM of one: the sample its note starts with
+// as the module holds it, with the loop when that lies in the same data. False for an empty instrument or one that no
+// event starts.
+uint32_t scumm_instrument_count(const ScummPlayer* player);
+bool scumm_instrument_pcm(const ScummPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames,
+                          uint32_t* loop_start, uint32_t* loop_frames);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 ScummPlayer* scumm_from_nuade(NuadeSong* song);

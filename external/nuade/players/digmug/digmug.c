@@ -1415,6 +1415,39 @@ int dm_get_instrument_count(const DmModule* module) {
     return module ? (int)module->number_of_instruments : 0;
 }
 
+bool dm_instrument_pcm(const DmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= (int)module->number_of_instruments)
+        return false;
+    const DmInstrument* in = &module->instruments[inst];
+    *loop_start = 0;
+    *loop_length = 0;
+    if (in->waveform_number >= 32) {
+        const uint32_t number = (uint32_t)in->waveform_number - 32;
+        if (number >= module->number_of_samples)
+            return false;
+        const DmSample* sample = &module->samples[number];
+        if (sample->sample_data == nullptr || sample->end_offset <= sample->start_offset)
+            return false;
+        *data = sample->sample_data + sample->start_offset;
+        *length = sample->end_offset - sample->start_offset;
+        if (sample->loop_start >= 0 && (uint32_t)sample->loop_start < *length) {
+            *loop_start = (uint32_t)sample->loop_start;
+            *loop_length = *length - (uint32_t)sample->loop_start;
+        }
+        return true;
+    }
+    uint32_t wave = in->waveform_number;
+    if (module->module_type == DM_TYPE_DIGITAL_MUGICIAN && in->effect != DM_INST_EFFECT_NONE)
+        wave = in->source_wave1;
+    if (wave >= module->number_of_waveforms || in->loop_length == 0)
+        return false;
+    *data = module->waveforms[wave];
+    *length = in->loop_length;
+    *loop_length = in->loop_length;
+    return true;
+}
+
 int dm_get_num_tracks(const DmModule* module) {
     return module ? (int)module->number_of_tracks : 0;
 }

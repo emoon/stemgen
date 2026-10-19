@@ -17,7 +17,7 @@
 #define HEADER_SIZE_MIN 0x6C0 // the module must be larger
 #define LENGTH_MAX 0x200000
 #define SAMPLES_OFFSET_FIELD 4
-#define INSTRUMENT_COUNT 31
+#define INSTRUMENT_COUNT TMY_INSTRUMENTS
 #define INSTRUMENTS_OFFSET 8
 #define INSTRUMENT_SIZE 14
 #define RESTART_OFFSET 0x1BA
@@ -621,4 +621,34 @@ TmyCell tmy_pattern_cell(const TmyPlayer* player, int order, int voice, int row)
                        .instrument = c.instrument / INSTRUMENT_STRIDE,
                        .effect = (uint8_t)effect,
                        .param = c.param };
+}
+
+bool tmy_instrument_pcm(const TmyPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    const TmyModule* m = &player->module;
+    if (index < 0 || index >= INSTRUMENT_COUNT) {
+        return false;
+    }
+    const Instrument in = module_instrument(m, (uint32_t)index + 1);
+    // a length of 0 would play the whole 64K words after the start: not a sound of its own
+    const uint64_t begin = (uint64_t)module_samples_offset(m) + in.start;
+    if (in.length_words == 0 || begin >= m->size) {
+        return false;
+    }
+    const uint64_t bytes = (uint64_t)in.length_words * 2;
+    *data = sample_at(m, in.start);
+    // the tail of a sample past the file is silence the original reads from chip memory
+    *length = (uint32_t)(begin + bytes <= m->size ? bytes : m->size - begin);
+    *loop_start = 0;
+    *loop_length = 0;
+    // the loop runs from an address of the same sample block; a word loop is the "no loop" of the Amiga
+    if (in.loop_length_words > 1 && in.loop_start >= in.start) {
+        const uint64_t from = in.loop_start - in.start;
+        const uint64_t loop_bytes = (uint64_t)in.loop_length_words * 2;
+        if (from + loop_bytes <= *length) {
+            *loop_start = (uint32_t)from;
+            *loop_length = (uint32_t)loop_bytes;
+        }
+    }
+    return true;
 }

@@ -137,6 +137,64 @@ BthVoiceState bth_voice_state(const BthPlayer* p, int voice) {
     return (BthVoiceState) { .note = p->voices[voice].note, .instrument = p->voices[voice].instrument };
 }
 
+static uint32_t instrument_record_bytes(const BthPlayer* p) {
+    return p->replayer.engine == BthEngine_Legacy ? BTH_LEGACY_INSTRUMENT_BYTES : BTH_INSTRUMENT_BYTES;
+}
+
+uint32_t bth_sample_count(const BthPlayer* p) {
+    const BthHeader* h = &p->header;
+    const uint32_t bytes = instrument_record_bytes(p);
+    // the table's end is the address of its last record
+    if (h->samples == 0 || h->samples_end < h->samples || h->samples >= p->image->module.size) {
+        return 0;
+    }
+    const uint32_t count = (h->samples_end - h->samples) / bytes + 1;
+    const uint32_t room = (p->image->module.size - h->samples) / bytes;
+    return count < room ? count : room;
+}
+
+bool bth_sample_pcm(const BthPlayer* p, uint32_t index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length) {
+    if (index >= bth_sample_count(p)) {
+        return false;
+    }
+    // the module as the init routine left it: the records hold sample addresses
+    const BthModule* m = &p->image->module;
+    const uint32_t record = p->header.samples + index * instrument_record_bytes(p);
+    uint32_t at;
+    uint32_t bytes;
+    uint32_t loop_from = 0;
+    uint32_t loop_to = 0;
+    if (p->replayer.engine == BthEngine_Legacy) {
+        const BthLegacyInstrument i = bthm_legacy_instrument(m, record);
+        at = i.sample;
+        bytes = i.length;
+    } else {
+        const BthInstrument i = bthm_instrument(m, record);
+        at = i.sample + p->replayer.sample_base;
+        if (i.one_shot) {
+            bytes = i.one_shot_length;
+        } else {
+            // the part before the repeat plays once, then loop_start to loop_end repeats
+            bytes = i.loop_end > 0 ? (uint32_t)i.loop_end : 0;
+            if (i.loop_start >= 0 && i.loop_end - i.loop_start > 1) {
+                loop_from = (uint32_t)i.loop_start;
+                loop_to = (uint32_t)i.loop_end;
+            }
+        }
+    }
+    at &= ~1u;
+    bytes &= ~1u;
+    if (bytes == 0 || at >= m->size || bytes > m->size - at) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + at;
+    *length = bytes;
+    *loop_start = loop_from;
+    *loop_length = loop_to - loop_from;
+    return true;
+}
+
 uint32_t bth_subsong_count(const BthPlayer* p) {
     return p->song_count;
 }

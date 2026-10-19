@@ -337,6 +337,10 @@ void sa_set_instrument_param(SaModule* module, int inst, const char* param, floa
 
 // Instrument name
 const char* sa_get_instrument_name(const SaModule* module, int inst);
+// The PCM instrument `inst` (0-based) starts with: its sample, or for a synth instrument the waveform that the synth
+// effects then change. Loop in bytes, 0 length for none. False when the instrument has no data.
+bool sa_instrument_pcm(const SaModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
 
 // Export: serialize current state back to SOARV1.0 binary format.
 // Returns bytes written, or 0 on failure. If out_buffer is NULL, returns required size.

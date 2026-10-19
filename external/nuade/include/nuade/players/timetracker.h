@@ -167,6 +167,11 @@ TtVoiceState tt_voice_state(const TtPlayer* player, int voice);
 // `order` 0 .. tt_order_count - 1, `voice` 0..3, `row` 0 .. TT_ROWS - 1.
 TtCell tt_pattern_cell(const TtPlayer* player, int order, int voice, int row);
 
+// The PCM of sample `index` (0-based, as NuadeVoiceInfo.instrument), delta decoded as the replayer plays it. Lengths
+// and loop in bytes. False for an index past the table or an empty sample.
+bool tt_sample_pcm(const TtPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 TtPlayer* tt_from_nuade(NuadeSong* song);
 

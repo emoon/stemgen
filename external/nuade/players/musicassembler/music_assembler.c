@@ -31,6 +31,8 @@ static const uint16_t s_periods[48]
         678,  640,  604,  570,  538,  508,  480,  453,  428,  404,  381, 360, 339, 320, 302, 285,
         269,  254,  240,  226,  214,  202,  190,  180,  170,  160,  151, 143, 135, 127, 120, 113 };
 static const int8_t s_empty_sample[4] = { 0, 0, 0, 0 };
+// A sample of at most this many words is a waveform, played through the wave length modifier.
+#define MA_WAVE_MAX_WORDS 128
 #define MA_EMPTY_SAMPLE_BYTES ((uint32_t)sizeof(s_empty_sample))
 
 // Module loading helpers
@@ -1565,6 +1567,36 @@ void ma_instrument_set_param(MaModule* module, int index, const char* param, flo
 
 int ma_sample_count(const MaModule* module) {
     return module == nullptr ? 0 : (int)module->sample_count;
+}
+
+bool ma_instrument_pcm(const MaModule* module, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    if (module == nullptr || index < 0 || index >= (int)module->instrument_count) {
+        return false;
+    }
+    const uint8_t number = module->instruments[index].sample_number;
+    if (number >= module->sample_count) {
+        return false;
+    }
+    const MaSample* sample = &module->samples[number];
+    if (sample->sample_data == s_empty_sample || sample->length == 0) {
+        return false;
+    }
+    *data = sample->sample_data;
+    *length = (uint32_t)sample->length * 2u;
+    // a repeat of one word is the sample's last word held, no loop
+    if (sample->loop_length <= 1 || sample->loop_length > sample->length) {
+        *loop_start = 0;
+        *loop_length = 0;
+    } else if (sample->length <= MA_WAVE_MAX_WORDS) {
+        // a waveform: the voice loops a window of it, which the wave length modifier moves around the whole cycle
+        *loop_start = 0;
+        *loop_length = *length;
+    } else {
+        *loop_start = (uint32_t)(sample->length - sample->loop_length) * 2u;
+        *loop_length = (uint32_t)sample->loop_length * 2u;
+    }
+    return true;
 }
 
 const char* ma_sample_name(const MaModule* module, int index) {

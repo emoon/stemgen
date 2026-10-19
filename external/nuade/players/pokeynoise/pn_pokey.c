@@ -97,12 +97,92 @@ static uint32_t divide_word(uint32_t value, uint32_t divisor) {
     return quotient > 0xFFFFu ? (value & 0xFFFFu) : quotient;
 }
 
-static PnSound sound_of(uint32_t wave, uint16_t words, uint32_t period, uint32_t volume) {
-    return (PnSound) { .wave = wave, .length_words = words, .period = (uint16_t)period, .volume = (uint8_t)volume };
+// The waveforms of the data hunk the sounds are made of (byte offset, length in words), in the order of the hunk.
+typedef enum PnWaveId {
+    PnWave_Silent,
+    PnWave_PureShort,
+    PnWave_PureMid,
+    PnWave_PureLong,
+    PnWave_PureLongest,
+    PnWave_Noise5Mid,
+    PnWave_Noise5Long,
+    PnWave_Noise5Longest,
+    PnWave_Noise5Short,
+    PnWave_Noise4CommonA,
+    PnWave_Noise4CommonB,
+    PnWave_Noise4CommonC,
+    PnWave_Noise4CommonD,
+    PnWave_Noise4CommonE,
+    PnWave_Noise4FifthA,
+    PnWave_Noise4FifthB,
+    PnWave_Noise4FifthC,
+    PnWave_Noise4ThirdA,
+    PnWave_Noise4ThirdB,
+    PnWave_Noise4ThirdC,
+    PnWave_Noise5_4CommonA,
+    PnWave_Noise5_4CommonB,
+    PnWave_Noise5_4CommonC,
+    PnWave_Noise5_4FifthA,
+    PnWave_Noise5_4FifthB,
+    PnWave_Noise5_4FifthC,
+    PnWave_Noise5_4ThirdA,
+    PnWave_Noise5_4ThirdB,
+    PnWave_Noise5_4ThirdC,
+    PnWave_Noise5_4MultipleA,
+    PnWave_Noise5_4MultipleB,
+    PnWave_Noise5_17,
+    PnWave_Noise17,
+    PnWave_Count,
+} PnWaveId;
+
+static const struct {
+    uint32_t offset;
+    uint16_t words;
+} k_waves[PnWave_Count] = {
+    [PnWave_Silent] = { PN_SILENT_WAVE, PN_SILENT_WORDS },
+    [PnWave_PureShort] = { 0x8, 0x1 },
+    [PnWave_PureMid] = { 0xA, 0x2 },
+    [PnWave_PureLong] = { 0xE, 0x4 },
+    [PnWave_PureLongest] = { 0x16, 0xD },
+    [PnWave_Noise5Mid] = { 0x30, 0x1F },
+    [PnWave_Noise5Long] = { 0x6E, 0x3E },
+    [PnWave_Noise5Longest] = { 0xEA, 0x5D },
+    [PnWave_Noise5Short] = { 0x1A4, 0xB },
+    [PnWave_Noise4CommonA] = { 0x1BA, 0x3 },
+    [PnWave_Noise4CommonB] = { 0x1C0, 0xF },
+    [PnWave_Noise4CommonC] = { 0x1DE, 0xF },
+    [PnWave_Noise4CommonD] = { 0x1FC, 0x1E },
+    [PnWave_Noise4CommonE] = { 0x238, 0x69 },
+    [PnWave_Noise4FifthA] = { 0x30A, 0x3 },
+    [PnWave_Noise4FifthB] = { 0x310, 0x3 },
+    [PnWave_Noise4FifthC] = { 0x316, 0x6 },
+    [PnWave_Noise4ThirdA] = { 0x322, 0x5 },
+    [PnWave_Noise4ThirdB] = { 0x32C, 0x5 },
+    [PnWave_Noise4ThirdC] = { 0x336, 0xA },
+    [PnWave_Noise5_4CommonA] = { 0x390, 0x5D },
+    [PnWave_Noise5_4CommonB] = { 0x44A, 0x1D1 },
+    [PnWave_Noise5_4CommonC] = { 0x7EC, 0x1D1 },
+    [PnWave_Noise5_4FifthA] = { 0xB8E, 0x5D },
+    [PnWave_Noise5_4FifthB] = { 0xC48, 0x5D },
+    [PnWave_Noise5_4FifthC] = { 0xD02, 0xBA },
+    [PnWave_Noise5_4ThirdA] = { 0xE76, 0x2A },
+    [PnWave_Noise5_4ThirdB] = { 0xECA, 0x9B },
+    [PnWave_Noise5_4ThirdC] = { 0x1000, 0x9B },
+    [PnWave_Noise5_4MultipleA] = { 0x1136, 0x5 },
+    [PnWave_Noise5_4MultipleB] = { 0x1140, 0xA },
+    [PnWave_Noise5_17] = { 0x277E, 0x2807 },
+    [PnWave_Noise17] = { 0x778C, 0x23BF },
+};
+
+static PnSound sound_of(PnWaveId wave, uint32_t period, uint32_t volume) {
+    return (PnSound) { .wave = k_waves[wave].offset,
+                       .length_words = k_waves[wave].words,
+                       .period = (uint16_t)period,
+                       .volume = (uint8_t)volume };
 }
 
 static PnSound silence(void) {
-    return sound_of(PN_SILENT_WAVE, PN_SILENT_WORDS, PN_SILENT_PERIOD, 0);
+    return sound_of(PnWave_Silent, PN_SILENT_PERIOD, 0);
 }
 
 // The scaling steps the sounds share. `period` is in 64 kHz clocks (8.8 fixed point); the factor brings it to Paula's
@@ -241,7 +321,7 @@ static PnSound noise_17(PnMachine* machine, unsigned channel, PnChannelConfig co
         volume = 0;
     }
     period = clamp_low(clamp_high(scale_to_paula(period, 0x84)));
-    return sound_of(0x778C, 0x23BF, period, paula_volume(volume));
+    return sound_of(PnWave_Noise17, period, paula_volume(volume));
 }
 
 // 5 bit polynomial mixed with the 17 bit one.
@@ -251,7 +331,7 @@ static PnSound noise_5_17(PnMachine* machine, unsigned channel, PnChannelConfig 
     const uint32_t period = plain_period(divisor, config.clock);
     update_memo(machine, channel, PnFamily_Noise5_17, period, volume);
     const uint32_t paula_period = clamp_low(clamp_high(scale_to_paula(period, 0x89)));
-    return sound_of(0x277E, 0x2807, paula_period, paula_volume(volume));
+    return sound_of(PnWave_Noise5_17, paula_period, paula_volume(volume));
 }
 
 // 5 bit polynomial: four waveforms by period range.
@@ -262,15 +342,15 @@ static PnSound noise_5(PnMachine* machine, unsigned channel, PnChannelConfig con
     update_memo(machine, channel, PnFamily_Noise5, period, volume);
     const uint32_t level = paula_volume(volume);
     if (period <= 0x280) {
-        return sound_of(0x1A4, 0xB, clamp_low_word(scale_to_paula(period, 0x9E)), level);
+        return sound_of(PnWave_Noise5Short, clamp_low_word(scale_to_paula(period, 0x9E)), level);
     }
     if (period <= 0xA00) {
-        return sound_of(0x30, 0x1F, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
+        return sound_of(PnWave_Noise5Mid, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
     }
     if (period <= 0x2000) {
-        return sound_of(0x6E, 0x3E, scale_to_paula(divide_word(period, 5), 0x8C), level);
+        return sound_of(PnWave_Noise5Long, scale_to_paula(divide_word(period, 5), 0x8C), level);
     }
-    return sound_of(0xEA, 0x5D, scale_to_paula(clamp_high((period * 2) / 0xD), 0x8C), level);
+    return sound_of(PnWave_Noise5Longest, scale_to_paula(clamp_high((period * 2) / 0xD), 0x8C), level);
 }
 
 // Pure tone: four waveforms by period range, the first is the shortest.
@@ -284,15 +364,15 @@ static PnSound pure_tone(PnMachine* machine, unsigned channel, PnChannelConfig c
     }
     const uint32_t level = paula_volume(volume);
     if (period <= 0x500) {
-        return sound_of(0x8, 0x1, scale_to_paula(period, 0x38), level);
+        return sound_of(PnWave_PureShort, scale_to_paula(period, 0x38), level);
     }
     if (period <= 0xC00) {
-        return sound_of(0xA, 0x2, scale_to_paula(divide_word(period, 5), 0x8C), level);
+        return sound_of(PnWave_PureMid, scale_to_paula(divide_word(period, 5), 0x8C), level);
     }
     if (period <= 0xC000) {
-        return sound_of(0xE, 0x4, scale_to_paula(divide_word(period, 0xA), 0x8C), level);
+        return sound_of(PnWave_PureLong, scale_to_paula(divide_word(period, 0xA), 0x8C), level);
     }
-    return sound_of(0x16, 0xD, scale_to_paula(clamp_high((period * 2) / 0x41), 0x8C), level);
+    return sound_of(PnWave_PureLongest, scale_to_paula(clamp_high((period * 2) / 0x41), 0x8C), level);
 }
 
 // The waveform set of the 4 bit counter is picked by the remainder of the divisor in clocks modulo 15 (its length).
@@ -324,37 +404,39 @@ static PnSound noise_4(PnMachine* machine, unsigned channel, PnChannelConfig con
             return silence();
         case PnPolySet_Common:
             if (period <= 0x280) {
-                return sound_of(0x1BA, 0x3, clamp_low_word(scale_to_paula(period, 0x8C)), level);
+                return sound_of(PnWave_Noise4CommonA, clamp_low_word(scale_to_paula(period, 0x8C)), level);
             }
             if (period <= 0xA00) {
-                return sound_of(0x1C0, 0xF, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
+                return sound_of(PnWave_Noise4CommonB, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
             }
             if (period <= 0x1800) {
-                return sound_of(0x1DE, 0xF, scale_to_paula(divide_word(period, 5), 0x8C), level);
+                return sound_of(PnWave_Noise4CommonC, scale_to_paula(divide_word(period, 5), 0x8C), level);
             }
             if (period <= 0x3800) {
-                return sound_of(0x1FC, 0x1E, scale_to_paula(divide_word(period, 0xA), 0x8C), level);
+                return sound_of(PnWave_Noise4CommonD, scale_to_paula(divide_word(period, 0xA), 0x8C), level);
             }
-            return sound_of(0x238, 0x69, clamp_high(scale_to_paula(period / 0x23, 0x8C)), level);
+            return sound_of(PnWave_Noise4CommonE, clamp_high(scale_to_paula(period / 0x23, 0x8C)), level);
         case PnPolySet_Fifth:
             if (dropped(machine, retrigger)) {
                 return silence();
             }
             if (period <= 0xA00) {
-                return sound_of(0x30A, 0x3, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)), level);
+                return sound_of(PnWave_Noise4FifthA, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)),
+                                level);
             }
             if (period <= 0x2000) {
-                return sound_of(0x310, 0x3, scale_to_paula(divide_word(period, 5), 0x8C), level);
+                return sound_of(PnWave_Noise4FifthB, scale_to_paula(divide_word(period, 5), 0x8C), level);
             }
-            return sound_of(0x316, 0x6, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
+            return sound_of(PnWave_Noise4FifthC, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
         default: // PnPolySet_Third
             if (period <= 0xA00) {
-                return sound_of(0x322, 0x5, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)), level);
+                return sound_of(PnWave_Noise4ThirdA, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)),
+                                level);
             }
             if (period <= 0x2000) {
-                return sound_of(0x32C, 0x5, scale_to_paula(divide_word(period, 5), 0x8C), level);
+                return sound_of(PnWave_Noise4ThirdB, scale_to_paula(divide_word(period, 5), 0x8C), level);
             }
-            return sound_of(0x336, 0xA, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
+            return sound_of(PnWave_Noise4ThirdC, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
     }
 }
 
@@ -371,41 +453,43 @@ static PnSound noise_5_4(PnMachine* machine, unsigned channel, PnChannelConfig c
             return silence();
         }
         if (period <= 0x280) {
-            return sound_of(0x1136, 0x5, clamp_low_word(scale_to_paula(period, 0x8C)), level);
+            return sound_of(PnWave_Noise5_4MultipleA, clamp_low_word(scale_to_paula(period, 0x8C)), level);
         }
-        return sound_of(0x1140, 0xA, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
+        return sound_of(PnWave_Noise5_4MultipleB, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
     }
     switch (poly4_set(timing.clocks)) {
         case PnPolySet_Silent:
             return silence();
         case PnPolySet_Common:
             if (period <= 0x280) {
-                return sound_of(0x390, 0x5D, clamp_low_word(scale_to_paula(period, 0x8C)), level);
+                return sound_of(PnWave_Noise5_4CommonA, clamp_low_word(scale_to_paula(period, 0x8C)), level);
             }
             if (period <= 0xA00) {
-                return sound_of(0x44A, 0x1D1, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
+                return sound_of(PnWave_Noise5_4CommonB, scale_to_paula(divide_word(period * 2, 5), 0x8C), level);
             }
-            return sound_of(0x7EC, 0x1D1, clamp_high(scale_to_paula(period / 5, 0x8C)), level);
+            return sound_of(PnWave_Noise5_4CommonC, clamp_high(scale_to_paula(period / 5, 0x8C)), level);
         case PnPolySet_Fifth:
             if (dropped(machine, retrigger)) {
                 return silence();
             }
             if (period <= 0xA00) {
-                return sound_of(0xB8E, 0x5D, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)), level);
+                return sound_of(PnWave_Noise5_4FifthA, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)),
+                                level);
             }
             if (period <= 0x2000) {
-                return sound_of(0xC48, 0x5D, scale_to_paula(divide_word(period, 5), 0x8C), level);
+                return sound_of(PnWave_Noise5_4FifthB, scale_to_paula(divide_word(period, 5), 0x8C), level);
             }
-            return sound_of(0xD02, 0xBA, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
+            return sound_of(PnWave_Noise5_4FifthC, clamp_high(scale_to_paula(period / 0xA, 0x8C)), level);
         default: // PnPolySet_Third
             if (period <= 0x280) {
                 const uint32_t stretched = multiply(period, 5) / 7;
-                return sound_of(0xE76, 0x2A, clamp_low_word(scale_to_paula(stretched, 0x90)), level);
+                return sound_of(PnWave_Noise5_4ThirdA, clamp_low_word(scale_to_paula(stretched, 0x90)), level);
             }
             if (period <= 0xA00) {
-                return sound_of(0xECA, 0x9B, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)), level);
+                return sound_of(PnWave_Noise5_4ThirdB, clamp_low_word(scale_to_paula(divide_word(period * 2, 5), 0x8C)),
+                                level);
             }
-            return sound_of(0x1000, 0x9B, clamp_high(scale_to_paula(period / 5, 0x8C)), level);
+            return sound_of(PnWave_Noise5_4ThirdC, clamp_high(scale_to_paula(period / 5, 0x8C)), level);
     }
 }
 

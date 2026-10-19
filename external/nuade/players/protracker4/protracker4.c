@@ -281,6 +281,9 @@ static bool parse_module(const uint8_t* data, size_t size, Pt4Module* m) {
                        .bpm = info.bpm,
                        .tempo_commands = info.tempo_commands };
     memcpy(m->orders, header.orders, PT4_ORDERS);
+    for (unsigned i = 0; i < PT4_SAMPLES; i++) {
+        memcpy(m->sample_names[i], module + 20 + i * 30, SAMPLE_NAME_SIZE);
+    }
     memcpy(m->title, info.title, sizeof(m->title));
     // The highest pattern is found with a signed byte compare: numbers from 0x80 on never count
     int max_pattern = 0;
@@ -1082,6 +1085,39 @@ int pt4_order_count(const Pt4Player* player) {
 
 const char* pt4_title(const Pt4Player* player) {
     return player->module.title;
+}
+
+bool pt4_sample_pcm(const Pt4Player* player, int n, Pt4SamplePcm* out) {
+    if (player == nullptr || n < 0 || n >= PT4_SAMPLES) {
+        return false;
+    }
+    const Pt4Module* m = &player->module;
+    const Pt4Sample* h = &m->samples[n];
+    // a length of 0 or 1 word is an empty sample
+    if (h->length <= 1 || !sample_usable(m, h) || h->start >= m->size) {
+        return false;
+    }
+    // what the replayer plays: up to the end of the loop (a loop from 0 repeats the start of the whole sample), or all
+    // of it; the file may end inside it
+    const bool loops = h->loop_length > 1;
+    uint32_t words = h->length;
+    if (loops && h->loop_start != 0 && (uint32_t)h->loop_start + h->loop_length < words) {
+        words = (uint32_t)h->loop_start + h->loop_length;
+    }
+    const uint32_t frames = words * 2 < m->size - h->start ? words * 2 : m->size - h->start;
+    if (frames == 0) {
+        return false;
+    }
+    *out = (Pt4SamplePcm) { .data = (const int8_t*)m->original + h->start,
+                            .frames = frames,
+                            .name = m->sample_names[n] };
+    if (loops && (uint32_t)h->loop_start * 2 < frames) {
+        const uint32_t start = (uint32_t)h->loop_start * 2;
+        const uint32_t len = (uint32_t)h->loop_length * 2;
+        out->loop_start = start;
+        out->loop_frames = start + len < frames ? len : frames - start;
+    }
+    return true;
 }
 
 Pt4VoiceState pt4_voice_state(const Pt4Player* player, int voice) {

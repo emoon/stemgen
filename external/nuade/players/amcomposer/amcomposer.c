@@ -193,6 +193,33 @@ int amc_instrument_count(const AmcPlayer* player) {
     return player->module.instrument_count;
 }
 
+bool amc_instrument_pcm(const AmcPlayer* player, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length) {
+    const AmcModule* m = &player->module;
+    if (inst < 0 || inst >= m->instrument_count) {
+        return false;
+    }
+    const Instrument instrument = instrument_at(m, INSTRUMENTS_OFFSET + INSTRUMENT_SIZE * (uint32_t)inst);
+    if (instrument.sample == nullptr || instrument.length_words == 0) {
+        return false;
+    }
+    const uint32_t bytes = 2u * instrument.length_words;
+    *data = instrument.sample;
+    *length = bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a loop of one word or less is the "no loop" the player writes
+    if (instrument.loop != nullptr && instrument.loop >= instrument.sample && instrument.loop_words > 1) {
+        const size_t start = (size_t)(instrument.loop - instrument.sample);
+        if (start < bytes) {
+            *loop_start = (uint32_t)start;
+            *loop_length
+                = bytes - *loop_start < 2u * instrument.loop_words ? bytes - *loop_start : 2u * instrument.loop_words;
+        }
+    }
+    return true;
+}
+
 AmcVoiceState amc_voice_state(const AmcPlayer* player, int voice) {
     const AmcVoice* v = &player->voice[voice];
     return (AmcVoiceState) { .period = v->last_period, .instrument = v->last_instrument };

@@ -134,6 +134,11 @@ EmsVoiceState ems_voice_state(const EmsPlayer* player, int voice);
 // `order` 0 .. ems_order_count - 1, `voice` 0..3, `row` 0 .. EMS_ROWS - 1.
 EmsCell ems_pattern_cell(const EmsPlayer* player, int order, int voice, int row);
 
+// The PCM of instrument `inst` (0-based, 0 .. EMS_INSTRUMENTS - 1) as the replayer hands it to Paula; sizes in bytes.
+// False for an instrument without data.
+bool ems_instrument_pcm(const EmsPlayer* player, int inst, const int8_t** data, uint32_t* bytes, uint32_t* loop_start,
+                        uint32_t* loop_bytes);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 EmsPlayer* ems_from_nuade(NuadeSong* song);
 

@@ -174,6 +174,9 @@ typedef enum JbBCommand {
     JbBCommand_Unknown, // a byte 0x8A..0x8F: no handler
 } JbBCommand;
 
+// The sample bank is made of blocks of 1 << JB_B_BLOCK_SHIFT bytes
+#define JB_B_BLOCK_SHIFT 7
+
 #define JB_B_SONG_SIZE 10
 
 typedef struct JbBSong {

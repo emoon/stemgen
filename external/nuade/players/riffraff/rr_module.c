@@ -23,7 +23,6 @@
 #define RR_MAGIC_RIFF 0x52494646u
 #define RR_MAGIC_RAFF 0x52414646u
 #define RR_PERIOD_MARKER 0x35803280u // the first two periods of every period table
-#define RR_MAX_SAMPLE_INSTRUMENTS 256u
 #define RR_FADE_BYTES 8u
 #define RR_ALL_VOICES 0xFu
 #define RR_HUNK_HEADER_BYTES 0x20u

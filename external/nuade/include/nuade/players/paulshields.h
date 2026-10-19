@@ -29,6 +29,7 @@ extern "C" {
 // own wave forms.
 #define PSH_SAMPLE_COUNT 16
 #define PSH_WAVE_COUNT 7
+#define PSH_OLD_INSTRUMENT_SIZE 6 // bytes of an instrument record of the old layout; the song names one by its offset
 #define PSH_ORDER_CODE_COUNT 6
 
 typedef struct PshPlayer PshPlayer;
@@ -104,6 +105,7 @@ typedef struct PshModule {
     int32_t pitch_envelopes;           // table of envelope offsets
     int32_t volume_envelopes;          // table of envelope offsets
     int32_t instruments;               // PshKind_Old: table of instrument records
+    uint64_t used_instruments;         // PshKind_Old: bit n is set when the song selects instrument record n
     PshVoiceHeader voices[PSH_VOICES]; // by Paula channel
 } PshModule;
 
@@ -169,6 +171,15 @@ bool psh_start(PshPlayer* player, NuadeVoices* voices);
 PshTickResult psh_tick(PshPlayer* player, NuadeVoices* voices);
 
 PshVoiceState psh_voice_state(const PshPlayer* player, int voice);
+
+// The sounds of the module numbered as PshVoiceState.instrument is: the sample table (the 16 samples of the file and
+// the replayer's built-in wave forms), or in the old layout the instrument records the song selects. psh_sample_count
+// is one past the highest number.
+uint32_t psh_sample_count(const PshPlayer* player);
+// 8-bit data inside the player's chip memory copy; the length and the repeat in bytes (length 0: no loop). False for a
+// number without data.
+bool psh_sample_pcm(const PshPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 PshPlayer* psh_from_nuade(NuadeSong* song);

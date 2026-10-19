@@ -144,6 +144,22 @@ static uint32_t digmug_tracker_cells(void* user_data, const NuadePosition* at, u
                               channel, row_lo, row_hi, out, cap, digmug_cell, module);
 }
 
+static uint32_t digmug_sample_count(void* user_data) {
+    return (uint32_t)dm_get_instrument_count(digmug_module(user_data));
+}
+
+static bool digmug_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dm_instrument_pcm(digmug_module(user_data), (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_digmug = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "digmug",
@@ -160,6 +176,8 @@ const NuadePlayer nuade_player_digmug = {
     .voice_info = digmug_voice_info,
     .tracker_info = digmug_tracker_info,
     .tracker_cells = digmug_tracker_cells,
+    .sample_count = digmug_sample_count,
+    .sample_get = digmug_sample_get,
 };
 
 DmModule* dm_from_nuade(NuadeSong* song) {

@@ -255,6 +255,12 @@ uint32_t mm_track_count(const MmPlayer* player);
 // A track (0 .. mm_track_count - 1); with 4 tracks track n plays on Paula voice n.
 MmVoiceState mm_voice_state(const MmPlayer* player, uint32_t track);
 
+// The sample of an instrument slot (the numbers MmVoiceState.instrument has) as the replayer holds it after loading:
+// 8-bit data inside the player's instrument block (the 8 voice replayer halves them), the length and the repeat in
+// bytes (length 0: no loop). False for a slot without a sample.
+bool mm_sample_pcm(const MmPlayer* player, uint32_t slot, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // Ticks one row of the display grid (NuadePlayer.grid_ticks) spans.
 uint32_t mm_grid_ticks(const MmPlayer* player);
 

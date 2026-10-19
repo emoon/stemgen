@@ -1486,6 +1486,60 @@ int syn_get_instrument_count(const SynModule* module) {
     return module ? module->num_instruments : 0;
 }
 
+bool syn_instrument_pcm(const SynModule* module, int inst, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                        uint32_t* loop_frames) {
+    if (!module || inst < 0 || inst >= module->num_instruments) {
+        return false;
+    }
+    const SynInstrument* instr = &module->instruments[inst];
+    *loop_start = 0;
+    *loop_frames = 0;
+    if (instr->synthesis_enabled) {
+        // The waveform the synth buffer starts from; the effects and the envelope generator change it while it plays.
+        if (instr->waveform_number >= module->num_waveforms || instr->waveform_length == 0) {
+            return false;
+        }
+        *data = module->waveforms[instr->waveform_number];
+        *frames = instr->waveform_length;
+        *loop_frames = instr->waveform_length;
+        return true;
+    }
+    if (instr->waveform_length == 0) {
+        return false;
+    }
+    const unsigned sample_num = instr->waveform_number & 0x3f;
+    if (sample_num >= (unsigned)module->num_samples || module->samples[sample_num].sample_addr == nullptr) {
+        return false;
+    }
+    // The part the voice plays: the one shot part and the repeat part behind it (a repeat length of 0 loops the whole
+    // sample, of 2 does not loop).
+    const SynSample* sample = &module->samples[sample_num];
+    uint32_t play_length = instr->waveform_length;
+    uint32_t start = 0;
+    uint32_t length = 0;
+    if (instr->repeat_length == 0) {
+        length = instr->waveform_length;
+    } else if (instr->repeat_length != 2) {
+        play_length += instr->repeat_length;
+        start = instr->waveform_length;
+        length = instr->repeat_length;
+    }
+    if (play_length > sample->length) {
+        play_length = sample->length;
+    }
+    if (play_length == 0) {
+        return false;
+    }
+    if (start + length > play_length) {
+        length = start < play_length ? play_length - start : 0;
+    }
+    *data = sample->sample_addr;
+    *frames = play_length;
+    *loop_start = start;
+    *loop_frames = length;
+    return true;
+}
+
 int syn_get_num_track_lines(const SynModule* module) {
     return module ? module->num_track_lines : 0;
 }

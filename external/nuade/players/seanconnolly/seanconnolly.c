@@ -100,6 +100,18 @@ ScoTickResult sco_tick(ScoPlayer* player, NuadeVoices* voices) {
     return result;
 }
 
+uint32_t sco_instrument_count(const ScoPlayer* player) {
+    return sco_module_instrument_count(&player->module);
+}
+
+bool sco_instrument_pcm(const ScoPlayer* player, uint32_t instrument, ScoPcm* out) {
+    if (instrument >= sco_instrument_count(player)) {
+        return false;
+    }
+    return is_sampler(player) ? sc2_instrument_pcm(&player->module, instrument, out)
+                              : sc3_instrument_pcm(&player->module, instrument, out);
+}
+
 ScoVoiceState sco_voice_state(const ScoPlayer* player, uint32_t voice) {
     if (is_sampler(player)) {
         const Sco2Voice* v = &player->sampler.voice[voice];

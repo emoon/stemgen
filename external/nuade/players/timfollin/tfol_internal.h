@@ -5,6 +5,7 @@
 #pragma once
 
 #include "nuade_base.h"
+#include "tfol_layout.h"
 #include <nuade/players/timfollin.h>
 
 // The replayer's constants shared by the replayer and the proof.
@@ -29,6 +30,11 @@
 #define TFOL_WAVE_SECOND_SAMPLE 0x40
 #define TFOL_WAVE_NOTE_OFF 0x80
 #define TFOL_WAVE_SAMPLE_INDEX 0x3f
+
+// The song of the module's song table that a subsong (0-based) plays.
+static inline uint32_t tfol_song_of_subsong(uint32_t subsong) {
+    return (subsong + 1) & (TFOL_SONGS - 1);
+}
 
 typedef enum TfolCommand {
     TfolCommand_Nop = 0,
@@ -70,8 +76,8 @@ typedef struct TfolEvent {
 bool tfol_module_locate(const uint8_t* data, size_t size, TfolModule* module);
 
 // The proof: walks every stream of every playable song and refuses the module when the replayer could leave the
-// modelled behaviour. `module->mem` holds the file bytes (read only).
-bool tfol_module_prove(const TfolModule* module);
+// modelled behaviour. `module->mem` holds the file bytes (read only). It fills module->instrument_known.
+bool tfol_module_prove(TfolModule* module);
 
 // Reads inside the module; outside it they read 0 and writes are dropped.
 uint8_t tfol_module_u8(const TfolModule* module, uint32_t offset);

@@ -90,6 +90,23 @@ static uint32_t futureplayer_grid_ticks(void* user_data, uint32_t subsong) {
     return fp_grid_ticks((const FpPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t futureplayer_sample_count(void* user_data) {
+    return fp_instrument_count((const FpPlayer*)user_data);
+}
+
+static bool futureplayer_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t bytes;
+    bool loops;
+    if (!fp_instrument_pcm((const FpPlayer*)user_data, n, &data, &bytes, &loops)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = bytes, .bits = 8, .loop_frames = loops ? bytes : 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_futureplayer = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "futureplayer",
@@ -104,6 +121,8 @@ const NuadePlayer nuade_player_futureplayer = {
     .metadata = futureplayer_metadata,
     .voice_info = futureplayer_voice_info,
     .grid_ticks = futureplayer_grid_ticks,
+    .sample_count = futureplayer_sample_count,
+    .sample_get = futureplayer_sample_get,
 };
 
 FpPlayer* fp_from_nuade(NuadeSong* song) {

@@ -1683,6 +1683,24 @@ const char* act_get_sample_name(const ActModule* module, int samp) {
     return module->samples[samp].name;
 }
 
+bool act_sample_pcm(const ActModule* module, int samp, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length) {
+    if (!module || samp < 0 || samp >= module->num_samples)
+        return false;
+    const ActSample* sample = &module->samples[samp];
+    if (sample->sample_data == nullptr || sample->length == 0)
+        return false;
+    *data = sample->sample_data;
+    *length = sample->length * 2U;
+    // the player loops from a loop length of 2 words on
+    const bool loops = sample->loop_length > 1 && sample->loop_start * 2U < *length;
+    *loop_start = loops ? sample->loop_start * 2U : 0;
+    *loop_length = loops ? sample->loop_length * 2U : 0;
+    if (*loop_start + *loop_length > *length)
+        *loop_length = *length - *loop_start;
+    return true;
+}
+
 // Display
 
 ActPosition act_position(const ActModule* module) {

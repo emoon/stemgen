@@ -164,6 +164,36 @@ uint32_t sp_grid_ticks(const SpPlayer* player) {
     return SP_DEFAULT_SPEED;
 }
 
+uint32_t sp_instrument_count(const SpPlayer* player) {
+    return player->layout == SpLayout_Longs ? SP_INSTRUMENTS : sp_word_instrument_total(&player->set);
+}
+
+bool sp_instrument_pcm(const SpPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames) {
+    const SpMemory* set = &player->set;
+    SpWave wave;
+    const bool found = player->layout == SpLayout_Longs ? sp_long_instrument_wave(set, inst, &wave)
+                                                        : sp_word_instrument_wave(set, inst, &wave);
+    if (!found || wave.size == 0 || !sp_wave_in_set(set, &wave)) {
+        return false;
+    }
+    // The waveform as the instrument stores it; the morph or sweep of a short one reads on from it while it plays.
+    const uint32_t start = (wave.header + wave.data) & ~1u;
+    uint32_t length = wave.size & ~1u;
+    if (!sp_memory_has(set, start, length) || length == 0) {
+        return false;
+    }
+    *data = (const int8_t*)set->data + start;
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    if ((wave.loop_start != 0 || wave.loop_end != 0) && wave.loop_end > wave.loop_start && wave.loop_end <= length) {
+        *loop_start = wave.loop_start;
+        *loop_frames = (uint32_t)(wave.loop_end - wave.loop_start);
+    }
+    return true;
+}
+
 SpVoiceState sp_voice_state(const SpPlayer* player, int voice) {
     if (voice < 0 || voice >= SP_VOICES) {
         return (SpVoiceState) { .note = -1, .instrument = -1 };

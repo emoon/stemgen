@@ -1372,6 +1372,56 @@ int is2_default_rows(const Is2Module* module) {
     return module->current_song_info != nullptr ? module->current_song_info->rows_per_track : 0;
 }
 
+int is2_sound_count(const Is2Module* module) {
+    return module->num_samples + module->num_instruments;
+}
+
+bool is2_sound_pcm(const Is2Module* module, int n, Is2SoundPcm* out) {
+    if (n < 0 || n >= is2_sound_count(module)) {
+        return false;
+    }
+    if (n >= module->num_samples) {
+        // A synth instrument: the stored waveform it starts from (the envelope generator picks the window of it).
+        const int k = n - module->num_samples;
+        const Is2Instrument* instr = &module->instruments[k];
+        const uint32_t length
+            = instr->waveform_length < sizeof(instr->waveform1) ? instr->waveform_length : sizeof(instr->waveform1);
+        if (length == 0) {
+            return false;
+        }
+        *out = (Is2SoundPcm) { .instrument = k + IS2_FIRST_SYNTH_INSTRUMENT,
+                               .data = instr->waveform1,
+                               .length = length,
+                               .loop_length = length };
+        return true;
+    }
+    const Is2Sample* samp = &module->samples[n];
+    if (samp->sample_number < 0 || samp->sample_number >= module->num_sample_data
+        || module->sample_data[samp->sample_number] == nullptr || samp->one_shot_length == 0) {
+        return false;
+    }
+    // A repeat of 1 is the "no loop" marker; the word the player plays behind the sample is not part of it.
+    const bool repeats = samp->repeat_length > 1;
+    const uint32_t one_shot = (uint32_t)samp->one_shot_length * 2;
+    const uint32_t play = one_shot + (repeats ? (uint32_t)samp->repeat_length * 2 : 0);
+    const uint32_t readable = module->sample_data_size[samp->sample_number] + 2U;
+    if (samp->repeat_length == 1 && samp->sample_number == 0) {
+        return false; // the player stays quiet for it
+    }
+    *out = (Is2SoundPcm) { .instrument = n,
+                           .data = module->sample_data[samp->sample_number],
+                           .length = play < readable ? play : readable };
+    if (samp->repeat_length == 0) {
+        out->loop_length = one_shot < out->length ? one_shot : out->length;
+    } else if (repeats && one_shot + (uint32_t)samp->repeat_length * 2 <= out->length) {
+        out->loop_start = one_shot;
+        out->loop_length = (uint32_t)samp->repeat_length * 2;
+    } else if (!repeats && one_shot < out->length) {
+        out->length = one_shot;
+    }
+    return out->length != 0;
+}
+
 Is2VoiceState is2_voice_state(const Is2Module* module, int voice) {
     const Is2VoiceInfo* v = &module->voices[voice];
     return (Is2VoiceState) { .note = v->transposed_note, .instrument = v->transposed_instrument };

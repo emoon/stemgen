@@ -163,6 +163,15 @@ uint16_t kh_voice_period(const KhPlayer* player, uint32_t voice);
 // The instrument the voice last selected, -1 if none.
 int32_t kh_voice_instrument(const KhPlayer* player, uint32_t voice);
 
+// Entries in the instrument tables of the subsongs (the longest).
+uint32_t kh_instrument_count(const KhPlayer* player);
+
+// The 8SVX sound of instrument `index` of the subsongs' tables (the first subsong that has it): the octave with the most samples, `length`
+// bytes; the repeat part is the loop (loop_length 0: the sound plays once). False when the entry has no sound.
+// The data belongs to the song and stays valid until kh_destroy.
+bool kh_instrument_pcm(const KhPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 KhPlayer* kh_from_nuade(NuadeSong* song);
 

@@ -61,6 +61,24 @@ static uint32_t speedya1system_grid_ticks(void* user_data, uint32_t subsong) {
     return sa1_grid_ticks((const Sa1Player*)user_data);
 }
 
+static uint32_t speedya1system_sample_count(void* user_data) {
+    (void)user_data;
+    return SA1_SAMPLES;
+}
+
+static bool speedya1system_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const Sa1Player* player = (const Sa1Player*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!sa1_sample_pcm(player, (int)n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_speedya1system = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "speedya1system",
@@ -75,6 +93,8 @@ const NuadePlayer nuade_player_speedya1system = {
     .metadata = speedya1system_metadata,
     .voice_info = speedya1system_voice_info,
     .grid_ticks = speedya1system_grid_ticks,
+    .sample_count = speedya1system_sample_count,
+    .sample_get = speedya1system_sample_get,
 };
 
 Sa1Player* sa1_from_nuade(NuadeSong* song) {

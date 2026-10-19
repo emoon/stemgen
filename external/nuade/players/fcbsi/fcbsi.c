@@ -369,3 +369,26 @@ FcBsiVoiceState fcbsi_voice_state(const FcBsiPlayer* p, int voice) {
     }
     return (FcBsiVoiceState) { .note = p->voices[voice].note, .instrument = p->voices[voice].instrument };
 }
+
+bool fcbsi_instrument_pcm(const FcBsiPlayer* player, int inst, const int8_t** data, uint32_t* length,
+                          uint32_t* loop_start, uint32_t* loop_length) {
+    if (player == nullptr || inst < 0 || inst >= FC_INSTRUMENT_COUNT) {
+        return false;
+    }
+    const FcBsiInstrument in = fcbsi_instrument(player, (unsigned)inst);
+    const uint32_t start = player->sample_offset[inst];
+    if (in.length == 0 || start >= player->size) {
+        return false;
+    }
+    // what lies beyond the end of the module is silence
+    const uint32_t bytes = in.length < player->size - start ? in.length : (uint32_t)player->size - start;
+    *data = (const int8_t*)(player->chip + start);
+    *length = bytes;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (in.loop_length != 0 && in.loop_offset < bytes) {
+        *loop_start = in.loop_offset;
+        *loop_length = in.loop_length < bytes - in.loop_offset ? in.loop_length : bytes - in.loop_offset;
+    }
+    return true;
+}

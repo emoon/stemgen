@@ -4,6 +4,8 @@
 #include "dsr_internal.h"
 #include <stdlib.h>
 
+#define MAX_INSTRUMENTS 256 // the instrument number is a byte
+
 bool dsr_probe(const uint8_t* data, size_t size) {
     DsrModule module;
     return dsr_module_locate(&module, data, size);
@@ -60,4 +62,36 @@ DsrVoiceState dsr_voice_state(const DsrPlayer* player, int voice) {
     }
     const DsrVoice* v = &player->voices[voice];
     return (DsrVoiceState) { .note = v->display_note, .instrument = v->display_instrument };
+}
+
+int dsr_instrument_count(const DsrPlayer* player) {
+    // the offset table (words) is followed by the length table (words) and the transpose table (bytes), one entry each
+    const DsrTables* t = &player->module.tables;
+    uint32_t count = MAX_INSTRUMENTS;
+    if (t->sample_lengths > t->sample_offsets && (t->sample_lengths - t->sample_offsets) / 2 < count) {
+        count = (t->sample_lengths - t->sample_offsets) / 2;
+    }
+    if (t->instrument_transposes > t->sample_offsets && t->instrument_transposes - t->sample_offsets < count) {
+        count = t->instrument_transposes - t->sample_offsets;
+    }
+    return (int)count;
+}
+
+bool dsr_instrument_pcm(const DsrPlayer* player, int instrument, const int8_t** data, uint32_t* length) {
+    if (instrument < 0 || instrument >= dsr_instrument_count(player)) {
+        return false;
+    }
+    const DsrModule* module = &player->module;
+    const DsrMemory* m = &module->memory;
+    const DsrInstrument ins = dsr_read_instrument(module, (uint8_t)instrument);
+    // the length is stored plus the version's trim: a stored length that does not reach the trim is no sound
+    const uint16_t stored = (uint16_t)(ins.length + module->version.length_trim);
+    if (stored <= module->version.length_trim || ins.sample >= m->size) {
+        return false;
+    }
+    uint32_t size = (uint32_t)ins.length * 2;
+    size = size < m->size - ins.sample ? size : m->size - ins.sample;
+    *data = (const int8_t*)m->data + ins.sample;
+    *length = size;
+    return true;
 }

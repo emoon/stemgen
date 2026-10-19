@@ -863,3 +863,40 @@ SiVoiceState si_voice_state(const SiPlayer* player, uint32_t voice) {
     const SiVoice* v = &player->voices[voice];
     return (SiVoiceState) { .period = v->shown_period, .instrument = v->shown_instrument };
 }
+
+uint32_t si_sample_count(const SiPlayer* player) {
+    return player->module.layout.sample_count;
+}
+
+bool si_sample_pcm(const SiPlayer* player, uint32_t index, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames) {
+    const SiModule* module = &player->module;
+    if (index >= module->layout.sample_count) {
+        return false;
+    }
+    const SiSample sample = si_module_sample(module, index);
+    const int64_t start = sample.offset & ~(int64_t)1;
+    int64_t bytes = (int64_t)sample.length_words * 2;
+    if (bytes == 0 || start < 0 || start >= (int64_t)module->size) {
+        return false;
+    }
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The sample plays once, then the repeat. It is part of the same data when it lies inside or right behind the
+    // sample; a repeat of one word is the "no loop" of the format.
+    const int64_t loop = sample.loop_offset & ~(int64_t)1;
+    const int64_t loop_bytes = (int64_t)sample.loop_length_words * 2;
+    if (loop_bytes > 2 && loop >= start && loop - start <= bytes) {
+        *loop_start = (uint32_t)(loop - start);
+        *loop_frames = (uint32_t)loop_bytes;
+        if (loop - start + loop_bytes > bytes) {
+            bytes = loop - start + loop_bytes;
+        }
+    }
+    if (bytes > (int64_t)module->size - start) {
+        return false;
+    }
+    *data = (const int8_t*)(module->memory + start);
+    *frames = (uint32_t)bytes;
+    return true;
+}

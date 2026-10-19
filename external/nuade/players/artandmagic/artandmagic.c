@@ -30,6 +30,9 @@
 // this is not a module of the corpus, and its later forms get no table entry.
 #define MAX_SAMPLES 256
 
+// Instrument numbers a byte can select
+#define MAX_INSTRUMENTS 256
+
 // Bytes of a record of the sample table, of the voice table and of the instrument table, and of an address.
 #define SAMPLE_RECORD_SIZE 12
 #define VOICE_TABLE_ENTRY_SIZE 8
@@ -314,7 +317,8 @@ static bool read_sample_form(const AamPlayer* p, uint32_t at, SampleForm* form) 
 static void build_samples(AamPlayer* p) {
     uint32_t form_at = p->layout.first_form;
     uint32_t dest = p->layout.first_form;
-    for (uint32_t number = 0; number < MAX_SAMPLES && rd32(p, form_at) == FORM_TAG; number++) {
+    uint32_t number = 0;
+    for (; number < MAX_SAMPLES && rd32(p, form_at) == FORM_TAG; number++) {
         SampleForm form;
         if (!read_sample_form(p, form_at, &form)
             || p->layout.sample_table + SAMPLE_RECORD_SIZE * (number + 1) > p->size) {
@@ -334,6 +338,7 @@ static void build_samples(AamPlayer* p) {
         dest += form.body_size;
         form_at = form.body + form.body_size;
     }
+    p->sample_count = number;
 }
 
 // The voice routines
@@ -784,6 +789,50 @@ AamTickResult aam_tick(AamPlayer* player, NuadeVoices* voices) {
         any = any || v->active;
     }
     return (AamTickResult) { .looped = player->looped, .ended = !any };
+}
+
+// The instrument table runs up to the next table of the layout behind it (the sample area at the latest).
+int aam_instrument_count(const AamPlayer* player) {
+    const AamLayout* layout = &player->layout;
+    const uint32_t others[] = { layout->periods,     layout->sample_table, layout->first_note, layout->first_form,
+                                layout->voice_table, layout->patterns,     layout->pitch_seqs };
+    uint32_t end = player->size;
+    for (size_t i = 0; i < nuade_sizeof_array(others); i++) {
+        if (others[i] > layout->instruments && others[i] < end) {
+            end = others[i];
+        }
+    }
+    const uint32_t count = (end - layout->instruments) / INSTRUMENT_SIZE;
+    return count < MAX_INSTRUMENTS ? (int)count : MAX_INSTRUMENTS;
+}
+
+bool aam_sample_pcm(const AamPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length) {
+    if (instrument < 0 || instrument >= aam_instrument_count(player)) {
+        return false;
+    }
+    const uint8_t sample = read_instrument(player, (uint8_t)instrument).sample;
+    if (sample >= player->sample_count) {
+        return false;
+    }
+    const SampleRecord record = read_sample_record(player, sample);
+    const uint32_t start = record.start - LOAD_ADDRESS;
+    // the data lies in the image; the Paula tail behind it is no part of the sample
+    if (record.length == 0 || record.start < LOAD_ADDRESS || start >= player->size
+        || record.length > player->size - start) {
+        return false;
+    }
+    *data = (const int8_t*)(player->image + start);
+    *length = record.length;
+    *loop_start = 0;
+    *loop_length = 0;
+    // a form without a repeat repeats its last two bytes: no loop
+    const uint32_t repeat = record.repeat_start - record.start;
+    if (record.repeat_start >= record.start && repeat < record.length && record.length - repeat > 2) {
+        *loop_start = repeat;
+        *loop_length = record.length - repeat;
+    }
+    return true;
 }
 
 AamVoiceState aam_voice_state(const AamPlayer* player, int voice) {

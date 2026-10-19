@@ -79,6 +79,22 @@ static uint32_t davidwhittaker_voice_info(void* user_data, NuadeVoiceInfo* out, 
     return n;
 }
 
+static uint32_t davidwhittaker_sample_count(void* user_data) {
+    return (uint32_t)dw_sample_count((const DwModule*)user_data);
+}
+
+static bool davidwhittaker_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dw_sample_pcm((const DwModule*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_davidwhittaker = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "davidwhittaker",
@@ -93,6 +109,8 @@ const NuadePlayer nuade_player_davidwhittaker = {
     .metadata = davidwhittaker_metadata,
     .voice_info = davidwhittaker_voice_info,
     .grid_ticks = davidwhittaker_grid_ticks,
+    .sample_count = davidwhittaker_sample_count,
+    .sample_get = davidwhittaker_sample_get,
 };
 
 DwModule* dw_from_nuade(NuadeSong* song) {

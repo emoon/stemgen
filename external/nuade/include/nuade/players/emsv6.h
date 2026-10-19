@@ -201,6 +201,13 @@ Ems6TrackState ems6_track_state(const Ems6Player* player, uint32_t track);
 // The version of the editor that wrote the module ("6.05").
 const char* ems6_version(const Ems6Player* player);
 
+// The instruments of the module (the sequencer addresses 64 at most) and the PCM of one, as the mixer reads it: signed
+// 8 bit, `length` and the loop in bytes. A wavetable gives all its waves with the first wave's size as the loop. False
+// for an instrument without data.
+uint32_t ems6_instrument_count(const Ems6Player* player);
+bool ems6_instrument_pcm(const Ems6Player* player, uint32_t inst, const int8_t** data, uint32_t* length,
+                         uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 Ems6Player* ems6_from_nuade(NuadeSong* song);
 

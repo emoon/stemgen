@@ -171,6 +171,12 @@ HdTickResult hd_tick(HdPlayer* player, NuadeVoices* voices);
 // A text of the header as a C string: up to its terminator or the end of the hunk, cut to `cap` - 1 bytes.
 void hd_text(const HdPlayer* player, HdText which, char* out, size_t cap);
 
+// The sample records, and the PCM of one (the number the instrument command gives). False for an empty record and for
+// record 0 (silence).
+uint32_t hd_sample_count(const HdPlayer* player);
+bool hd_sample_pcm(const HdPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames);
+
 // Ticks per sequencer step the replayer starts with.
 uint32_t hd_grid_ticks(const HdPlayer* player);
 

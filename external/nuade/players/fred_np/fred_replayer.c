@@ -1961,6 +1961,27 @@ int fred_get_instrument_count(const FredModule* module) {
     return module ? (int)module->inst_num : 0;
 }
 
+bool fred_instrument_pcm(const FredModule* module, int inst, const int8_t** data, uint32_t* length,
+                         uint32_t* loop_start, uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= (int)module->inst_num || !module->instruments)
+        return false;
+    const FredInstrument* in = &module->instruments[inst];
+    if (in->inst_type != FRED_INST_SAMPLE || in->sample_addr == nullptr || in->length == 0)
+        return false;
+    *data = in->sample_addr;
+    *length = in->length < in->sample_size ? in->length : in->sample_size;
+    *loop_start = 0;
+    *loop_length = 0;
+    // the loop as the note start sets it
+    if (in->repeat_len == 0xffff) {
+        *loop_length = *length;
+    } else if (in->repeat_len != 0 && in->repeat_len < *length) {
+        *loop_start = in->repeat_len;
+        *loop_length = *length - in->repeat_len;
+    }
+    return *length != 0;
+}
+
 const char* fred_get_instrument_name(const FredModule* module, int inst) {
     (void)module;
     (void)inst;

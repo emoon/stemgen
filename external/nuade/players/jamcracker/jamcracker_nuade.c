@@ -125,6 +125,28 @@ static uint32_t jamcracker_tracker_cells(void* user_data, const NuadePosition* a
                               out, cap, jamcracker_cell, user_data);
 }
 
+static uint32_t jamcracker_sample_count(void* user_data) {
+    return (uint32_t)jc_instrument_count((const JcPlayer*)user_data);
+}
+
+static bool jamcracker_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const JcPlayer* player = (const JcPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length;
+    bool loops;
+    if (!jc_instrument_pcm(player, (int)n, &data, &length, &loops)) {
+        return false;
+    }
+    const char* name = jc_instrument_name(player, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != 0 ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_frames = loops ? length : 0 };
+    return true;
+}
+
 const NuadePlayer nuade_player_jamcracker = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "jamcracker",
@@ -141,6 +163,8 @@ const NuadePlayer nuade_player_jamcracker = {
     .voice_info = jamcracker_voice_info,
     .tracker_info = jamcracker_tracker_info,
     .tracker_cells = jamcracker_tracker_cells,
+    .sample_count = jamcracker_sample_count,
+    .sample_get = jamcracker_sample_get,
 };
 
 JcPlayer* jc_from_nuade(NuadeSong* song) {

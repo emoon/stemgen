@@ -68,6 +68,24 @@ static uint32_t riffraff_grid_ticks(void* user_data, uint32_t subsong) {
     return RR_GRID_TICKS;
 }
 
+static uint32_t riffraff_sample_count(void* user_data) {
+    return rr_instrument_count((const RrPlayer*)user_data);
+}
+
+static bool riffraff_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    RrInstrumentPcm pcm;
+    if (!rr_instrument_pcm((const RrPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_riffraff = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "riffraff",
@@ -82,6 +100,8 @@ const NuadePlayer nuade_player_riffraff = {
     .metadata = riffraff_metadata,
     .voice_info = riffraff_voice_info,
     .grid_ticks = riffraff_grid_ticks,
+    .sample_count = riffraff_sample_count,
+    .sample_get = riffraff_sample_get,
 };
 
 RrPlayer* rr_from_nuade(NuadeSong* song) {

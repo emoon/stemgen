@@ -103,6 +103,9 @@ static void start_note(KimPlayer* player, KimVoice* voice, const KimCell* cell) 
     voice->volume = 0;
     voice->instrument = cell->instrument;
     voice->started = true;
+    if (cell->instrument >= player->instrument_count) {
+        player->instrument_count = (uint32_t)cell->instrument + 1;
+    }
 
     set_volume_ramps(voice, &instrument);
     set_pitch_ramps(player, voice, &instrument, cell->note);
@@ -349,6 +352,38 @@ uint32_t kim_grid_ticks(const KimPlayer* player) {
         return speed + 1;
     }
     return speed == 0x80 ? 129 : 1;
+}
+
+uint32_t kim_instrument_count(const KimPlayer* player) {
+    return player->instrument_count;
+}
+
+bool kim_instrument_pcm(const KimPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length) {
+    KimInstrument instrument;
+    uint32_t sample = 0;
+    if (number > UINT8_MAX || !kim_instrument(&player->module, (uint8_t)number, &instrument)
+        || !kim_sample_offset(&player->module, instrument.sample, &sample)) {
+        return false;
+    }
+    const uint32_t start = (sample + instrument.start) & ~1u;
+    const uint32_t words = instrument.length_words == 0 ? 0x10000u : instrument.length_words;
+    if (!kim_range_valid(&player->module, start, instrument.length_words)) {
+        return false;
+    }
+    *data = (const int8_t*)player->chip + start;
+    *length = words * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (instrument.loops) {
+        const uint32_t loop = (sample + instrument.loop_start) & ~1u;
+        const uint32_t loop_words = instrument.loop_words == 0 ? 0x10000u : instrument.loop_words;
+        if (loop >= start && (uint64_t)loop + loop_words * 2u <= (uint64_t)start + *length) {
+            *loop_start = loop - start;
+            *loop_length = loop_words * 2;
+        }
+    }
+    return true;
 }
 
 KimVoiceState kim_voice_state(const KimPlayer* player, uint32_t voice) {

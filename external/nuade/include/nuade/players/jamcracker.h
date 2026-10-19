@@ -131,6 +131,10 @@ JcTickResult jc_tick(JcPlayer* player, NuadeVoices* voices);
 int jc_instrument_count(const JcPlayer* player);
 // 0-based; the instrument's name, or "" when out of range.
 const char* jc_instrument_name(const JcPlayer* player, int instrument);
+// The PCM of an instrument (0-based) as stored: a plain instrument's wave, for an AM instrument its first source wave
+// (the voices play windows built from its two source waves). False for an instrument without wave data. `loops`: the
+// whole wave repeats.
+bool jc_instrument_pcm(const JcPlayer* player, int instrument, const int8_t** data, uint32_t* length, bool* loops);
 
 // The row decoded by the last row tick (position 0, row 0 before the first one).
 JcPosition jc_position(const JcPlayer* player);

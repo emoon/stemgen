@@ -73,6 +73,7 @@ typedef struct Pt4Module {
     uint16_t bpm;        // start tempo, 0 = 125
     bool tempo_commands; // INFO flags bit 0: Fxx from 0x20 on sets the tempo (otherwise a speed)
     char title[PT4_INFO_TITLE_SIZE + 1];
+    char sample_names[PT4_SAMPLES][23]; // as stored, 22 characters and a 0
 } Pt4Module;
 
 typedef struct Pt4Voice {
@@ -159,6 +160,16 @@ int pt4_order_count(const Pt4Player* player);
 
 // The module name (INFO chunk), "" if none.
 const char* pt4_title(const Pt4Player* player);
+
+// The PCM of sample `n` (0..30) as the file holds it, before the replayer patches it. False for an empty sample.
+typedef struct Pt4SamplePcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = no loop
+    const char* name;
+} Pt4SamplePcm;
+bool pt4_sample_pcm(const Pt4Player* player, int n, Pt4SamplePcm* out);
 
 Pt4VoiceState pt4_voice_state(const Pt4Player* player, int voice);
 

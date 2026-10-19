@@ -175,6 +175,11 @@ DhCell dh_pattern_cell(const DhPlayer* player, int order, int voice, int row);
 // Rows of the pattern at `order`.
 int dh_pattern_rows(const DhPlayer* player, int order);
 
+// The sound of built-in instrument 0..DH_INSTRUMENTS - 1 as the song starts with it (the pulse width sweep rewrites the
+// wave of a synthetic instrument while it plays). A one-shot wave has no loop; the wave of a synthetic instrument is
+// one cycle that repeats. False for a synthetic instrument without a wave.
+bool dh_instrument_pcm(int inst, const int8_t** data, uint32_t* length, bool* loops);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DhPlayer* dh_from_nuade(NuadeSong* song);
 

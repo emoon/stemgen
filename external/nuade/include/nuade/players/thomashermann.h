@@ -151,6 +151,12 @@ bool thm_start(ThmPlayer* player, uint32_t subsong, uint32_t sample_rate, NuadeV
 ThmTickResult thm_tick(ThmPlayer* player, NuadeVoices* voices);
 ThmVoiceState thm_voice_state(const ThmPlayer* player, uint32_t voice);
 
+// The instrument numbers (1 .. the module's count; number 0 is the empty record, so the count includes it) and the PCM
+// of one, from the sample file (8 bit). The loop is the loop part, for an instrument that has one.
+uint32_t thm_instrument_count(const ThmPlayer* player);
+bool thm_instrument_pcm(const ThmPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 ThmPlayer* thm_from_nuade(NuadeSong* song);
 

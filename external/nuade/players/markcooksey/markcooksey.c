@@ -71,6 +71,9 @@
 // The sample base holds a silent block of this many words that a one-shot sample repeats.
 #define SILENCE_WORDS 0x20
 
+// The instrument number is a byte.
+#define INSTRUMENT_MAX 256
+
 #define VOLUME_MAX 0x40
 
 // The replayer's variables start with a flag byte, the flags of the effects slots and the master volume; the voice
@@ -265,6 +268,59 @@ static McInstrument read_instrument(const McModule* m, int number) {
     ins.pitch_envelope_speed = module_u8(m, at + 25);
     ins.gain = module_u16(m, at + 26);
     return ins;
+}
+
+uint32_t mc_instrument_count(const McPlayer* player) {
+    const McModule* m = &player->module;
+    uint32_t first_record = m->size;
+    uint32_t count = 0;
+    while (count < INSTRUMENT_MAX && m->instruments + 2u * count < first_record) {
+        const uint32_t record = pc_relative_target(m, m->instruments + 2u * count);
+        first_record = record < first_record ? record : first_record;
+        count++;
+    }
+    return count;
+}
+
+bool mc_instrument_pcm(const McPlayer* player, uint32_t number, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames) {
+    const McModule* m = &player->module;
+    if (number >= mc_instrument_count(player)) {
+        return false;
+    }
+    const McInstrument ins = read_instrument(m, (int)number);
+    if (ins.sample == 0 || ins.sample_words == 0 || ins.sample >= m->size) {
+        return false;
+    }
+    const uint32_t even = ins.sample & ~1u;
+    uint32_t length = (uint32_t)ins.sample_words * 2;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // the repeat block is a second address: it is part of the sound when it continues the first block or lies in it
+    const uint32_t repeat = ins.loop & ~1u;
+    const uint32_t repeat_length = (uint32_t)ins.loop_words * 2;
+    if (ins.loop != 0 && repeat_length > 2) {
+        if (repeat == even + length) {
+            *loop_start = length;
+            *loop_frames = repeat_length;
+            length += repeat_length;
+        } else if (repeat >= even && repeat - even + repeat_length <= length) {
+            *loop_start = repeat - even;
+            *loop_frames = repeat_length;
+        }
+    }
+    if (length > m->size - even) {
+        length = m->size - even;
+        if (*loop_start >= length) {
+            *loop_start = 0;
+            *loop_frames = 0;
+        } else if (*loop_start + *loop_frames > length) {
+            *loop_frames = length - *loop_start;
+        }
+    }
+    *data = (const int8_t*)(m->data + even);
+    *frames = length;
+    return true;
 }
 
 // The period of pitch step `step`.

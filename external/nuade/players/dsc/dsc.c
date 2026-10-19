@@ -11,6 +11,7 @@
 #include <nuade/players/dsc.h>
 
 #include "nuade_base.h"
+#include "nuade_paula.h"
 #include "nuade_paula_channel.h"
 #include <stdlib.h>
 
@@ -305,4 +306,31 @@ int dsc_tempo(const DscPlayer* player) {
 
 DscVoiceState dsc_voice_state(const DscPlayer* player, int voice) {
     return (DscVoiceState) { .sound = player->song.voices[voice].sound };
+}
+
+int dsc_sound_count(const DscPlayer* player) {
+    return player->module.sound_count;
+}
+
+bool dsc_sound_pcm(const DscPlayer* player, int sound, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length, uint32_t* rate) {
+    const DscModule* m = &player->module;
+    if (sound < 0 || sound >= m->sound_count) {
+        return false;
+    }
+    const Sound s = sound_at(m, (uint8_t)sound);
+    const uint32_t start = m->samples + s.offset;
+    if (s.length == 0 || s.offset > m->size || start > m->size || s.length > m->size - start) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + start;
+    *length = s.length;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (s.repeats != 0 && s.loop_start < s.length) {
+        *loop_start = s.loop_start;
+        *loop_length = s.length - s.loop_start;
+    }
+    *rate = s.period != 0 ? (uint32_t)(NUADE_PAULA_CLOCK_PAL / s.period) : 0;
+    return true;
 }

@@ -117,6 +117,11 @@ uint32_t sa1_grid_ticks(const Sa1Player* player);
 
 Sa1VoiceState sa1_voice_state(const Sa1Player* player, int voice);
 
+// The PCM of sample 0..SA1_SAMPLES-1 as a note with an envelope plays it (one shot part, then the repeat part, which
+// is the loop; 8 bit). False for an empty entry.
+bool sa1_sample_pcm(const Sa1Player* player, int sample, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                    uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 Sa1Player* sa1_from_nuade(NuadeSong* song);
 

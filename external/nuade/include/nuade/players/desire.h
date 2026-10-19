@@ -176,6 +176,13 @@ bool dsr_start(DsrPlayer* player, int subsong, NuadeVoices* voices);
 DsrTickResult dsr_tick(DsrPlayer* player, NuadeVoices* voices);
 DsrVoiceState dsr_voice_state(const DsrPlayer* player, int voice);
 
+// The instruments of the module: numbers 0 .. dsr_instrument_count - 1 (the tables behind the sample offsets bound
+// them). dsr_instrument_pcm is false for an empty instrument (length 0) and for a sample that starts outside the
+// module; one that runs past the module's end is cut there. The module sets no loop: the sample repeats as a whole
+// while the note plays.
+int dsr_instrument_count(const DsrPlayer* player);
+bool dsr_instrument_pcm(const DsrPlayer* player, int instrument, const int8_t** data, uint32_t* length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DsrPlayer* dsr_from_nuade(NuadeSong* song);
 

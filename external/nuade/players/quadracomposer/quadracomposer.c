@@ -1255,6 +1255,21 @@ const char* qc_sample_name(const QcModule* module, int index) {
     return module->samples[index].name;
 }
 
+bool qc_sample_pcm(const QcModule* module, int index, QcSamplePcm* out) {
+    if (!module || index < 0 || index >= 256)
+        return false;
+    const QcSample* samp = &module->samples[index];
+    if (samp->data == nullptr || samp->length == 0)
+        return false;
+    // what the player hands to Paula: up to the end of the loop when the sample loops
+    const bool loops = (samp->control_byte & QC_SAMPLE_CONTROL_LOOP) != 0 && samp->loop_length != 0;
+    *out = (QcSamplePcm) { .data = samp->data,
+                           .frames = loops ? samp->loop_start + samp->loop_length : samp->length,
+                           .loop_start = loops ? samp->loop_start : 0,
+                           .loop_frames = loops ? samp->loop_length : 0 };
+    return true;
+}
+
 // Edit API
 
 int qc_get_instrument_count(const QcModule* module) {

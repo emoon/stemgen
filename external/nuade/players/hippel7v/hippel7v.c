@@ -182,6 +182,31 @@ H7vTickResult h7v_tick(H7vPlayer* player, NuadeVoices* voices) {
     return (H7vTickResult) { .length = playing_words * 2 * output->period + margin, .looped = s->looped };
 }
 
+uint32_t h7v_sample_count(const H7vPlayer* player) {
+    return player->module.sample_count;
+}
+
+bool h7v_sample_pcm(const H7vPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                    uint32_t* loop_frames) {
+    const H7vModule* m = &player->module;
+    if (n >= m->sample_count || n > UINT8_MAX) {
+        return false;
+    }
+    const H7vSampleRecord r = h7v_sample_record(m, (uint8_t)n);
+    const uint64_t length = (uint64_t)r.length * 2;
+    const uint64_t offset = (uint64_t)m->sample_data + r.start;
+    if (length == 0 || offset + length > m->size) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + offset;
+    *frames = (uint32_t)length;
+    // a repeat of one word (or none) is the "no loop" the replayer writes
+    const bool loops = r.loop_length > 1 && (uint64_t)r.loop_offset + (uint64_t)r.loop_length * 2 <= length;
+    *loop_start = loops ? r.loop_offset : 0;
+    *loop_frames = loops ? (uint32_t)r.loop_length * 2 : 0;
+    return true;
+}
+
 int h7v_speed(const H7vPlayer* player) {
     return player->song.speed;
 }

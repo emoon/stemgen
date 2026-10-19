@@ -174,6 +174,11 @@ AmosTickResult amos_tick(AmosPlayer* player, NuadeVoices* voices);
 const char* amos_title(const AmosPlayer* player);
 const char* amos_sample_name(const AmosPlayer* player, int sample);
 
+// Sample slots the bank holds, and the PCM of one (0-based) as the bank stores it, in bytes. False for an empty slot.
+int amos_sample_count(const AmosPlayer* player);
+bool amos_sample_pcm(const AmosPlayer* player, int sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                     uint32_t* loop_length);
+
 // The row played by the last row tick (position 0, row 0 before the first one).
 AmosPosition amos_position(const AmosPlayer* player);
 int amos_order_count(const AmosPlayer* player);

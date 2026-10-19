@@ -384,6 +384,36 @@ bool pa_start(PaPlayer* player, NuadeVoices* voices) {
     return true;
 }
 
+bool pa_sample_pcm(const PaPlayer* player, uint32_t number, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    PaInstrument instrument;
+    if (number == 0 || number > player->module.instrument_count
+        || !pa_module_instrument(&player->module, number, &instrument)) {
+        return false;
+    }
+    // what the voice plays: the sample, or for a looped instrument only the part that repeats (see
+    // voice_load_instrument), whose length 0 is 65536 words
+    uint32_t offset = player->samples.start[number - 1];
+    uint32_t words = instrument.length_words;
+    const bool loops = instrument.loop_length_words != PA_NO_LOOP_WORDS;
+    if (loops) {
+        offset += instrument.loop_offset;
+        words = instrument.loop_length_words != 0 ? instrument.loop_length_words : 0x10000u;
+    }
+    const int8_t* start = pa_samples_lc(&player->samples, offset);
+    if (start == nullptr || words == 0) {
+        return false;
+    }
+    uint32_t bytes = words * 2u;
+    const uint32_t available = player->samples.size - (offset & ~1u);
+    bytes = bytes < available ? bytes : available;
+    *data = start;
+    *length = bytes;
+    *loop_start = 0;
+    *loop_length = loops ? bytes : 0;
+    return true;
+}
+
 PaVoiceState pa_voice_state(const PaPlayer* player, uint32_t voice) {
     if (voice >= PA_VOICES) {
         return (PaVoiceState) { .period = 0, .instrument = -1 };

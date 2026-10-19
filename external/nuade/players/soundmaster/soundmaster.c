@@ -8,6 +8,7 @@
 #include <string.h>
 
 #define MAX_MODULE_BYTES 0x200000u // the chip memory UADE has for a module
+#define MAX_INSTRUMENTS 64u        // an instrument number is masked to 6 bits
 #define DUMMY_PERIOD 0xA0
 #define FADE_STEPS_MASK 0x7F
 #define ROW_SPEED 0xFD
@@ -445,4 +446,49 @@ SmstVoiceState smst_voice_state(const SmstPlayer* p, int voice) {
         return (SmstVoiceState) { .note = -1, .instrument = -1 };
     }
     return (SmstVoiceState) { .note = p->voices[voice].shown_note, .instrument = p->voices[voice].shown_instrument };
+}
+
+int smst_instrument_count(const SmstPlayer* p) {
+    const SmstTables* t = &p->module.tables;
+    const uint32_t size = p->module.version->instrument_size;
+    // the arpeggio table follows the instruments in both layouts
+    const uint32_t room = t->arpeggio > t->instruments ? (t->arpeggio - t->instruments) / size : MAX_INSTRUMENTS;
+    return (int)(room < MAX_INSTRUMENTS ? room : MAX_INSTRUMENTS);
+}
+
+bool smst_instrument_pcm(const SmstPlayer* p, int number, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                         uint32_t* loop_length) {
+    if (number < 0 || number >= smst_instrument_count(p)) {
+        return false;
+    }
+    const SmstModule* m = &p->module;
+    const SmstInstrument ins = smst_instrument(m, (uint8_t)number);
+    // the wave a note starts with (see start_sample); an all-zero record is an unused one
+    const uint8_t wave = ins.arpeggio_length != 0 ? smst_u8(m, m->tables.wave + ins.arpeggio_start) : ins.wave;
+    if (wave == 0 && ins.attack == 0 && ins.peak == 0 && ins.decay == 0 && ins.sustain == 0
+        && ins.arpeggio_length == 0) {
+        return false;
+    }
+    const SmstSlot slot = smst_slot(m, wave);
+    const uint32_t start = slot.sample & ~1u;
+    uint32_t bytes = (uint32_t)slot.length * 2;
+    if (bytes == 0 || start >= m->size) {
+        return false;
+    }
+    *loop_start = 0;
+    *loop_length = 0;
+    // a loop of one word is the "no loop" of the format, 0 plays the silent word
+    if (slot.loop_length > 1) {
+        *loop_start = slot.loop_offset;
+        *loop_length = (uint32_t)slot.loop_length * 2;
+        if (*loop_start + *loop_length > bytes) {
+            bytes = *loop_start + *loop_length;
+        }
+    }
+    if (bytes > m->size - start) {
+        return false;
+    }
+    *data = smst_sample_pointer(m, start);
+    *length = bytes;
+    return true;
 }

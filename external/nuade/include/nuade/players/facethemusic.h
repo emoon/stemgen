@@ -339,6 +339,10 @@ FtmVoiceState ftm_voice_state(const FtmModule* module, int voice);
 // Edit API
 int ftm_get_instrument_count(const FtmModule* module);
 const char* ftm_get_instrument_name(const FtmModule* module, int inst);
+// The PCM of sample `inst` (0-based) as the player hands it to Paula: signed 8 bit, sizes in bytes. False for a sample
+// that has no data in the file.
+bool ftm_sample_pcm(const FtmModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length);
 int ftm_get_num_measures(const FtmModule* module);
 int ftm_get_rows_per_measure(const FtmModule* module);
 

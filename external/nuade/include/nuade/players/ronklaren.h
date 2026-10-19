@@ -214,6 +214,13 @@ RkVoiceState rk_voice_state(const RkModule* module, int channel);
 // Edit API
 int rk_get_instrument_count(const RkModule* module);
 
+// The sound of instrument `inst` as the file holds it. False for an instrument without sample data.
+typedef struct RkInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_frames; // 0 = plays once; a synthesis instrument loops whole
+} RkInstrumentPcm;
+bool rk_instrument_pcm(const RkModule* module, int inst, RkInstrumentPcm* out);
 float rk_get_instrument_param(const RkModule* module, int inst, const char* param);
 void rk_set_instrument_param(RkModule* module, int inst, const char* param, float value);
 

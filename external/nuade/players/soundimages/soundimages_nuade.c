@@ -69,6 +69,25 @@ static uint32_t soundimages_voice_info(void* user_data, NuadeVoiceInfo* out, uin
     return n;
 }
 
+static uint32_t soundimages_sample_count(void* user_data) {
+    return si_sample_count((const SiPlayer*)user_data);
+}
+
+static bool soundimages_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!si_sample_pcm((const SiPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = frames,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundimages = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundimages",
@@ -82,6 +101,8 @@ const NuadePlayer nuade_player_soundimages = {
     .tick = soundimages_tick,
     .metadata = soundimages_metadata,
     .voice_info = soundimages_voice_info,
+    .sample_count = soundimages_sample_count,
+    .sample_get = soundimages_sample_get,
 };
 
 SiPlayer* si_from_nuade(NuadeSong* song) {

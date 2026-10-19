@@ -605,3 +605,24 @@ JoVoiceState jo_a_voice_state(const JoA* a, int voice) {
     return jo_shown_state(v->started && !v->rest, a->paula[voice].period,
                           (uint16_t)(v->sample_entry - a->version->first_entry) / SAMPLE_RECORD_SIZE);
 }
+
+// The sample records lie from the one the first sample entry names to the silence behind them.
+static uint32_t first_record(const JoAVersion* version) {
+    return version->samples + jom_offset16(version->first_entry);
+}
+
+uint32_t jo_a_instrument_count(const JoAVersion* version) {
+    const uint32_t first = first_record(version);
+    return version->silence > first ? (version->silence - first) / SAMPLE_RECORD_SIZE : 0;
+}
+
+// The Paula registers cover the first block of the sample: the replayer starts the sample with it and repeats it
+// unless the sample program sets another.
+bool jo_a_instrument_sound(const JoAVersion* version, const JoModule* m, uint32_t number, JoSound* out) {
+    if (number >= jo_a_instrument_count(version)) {
+        return false;
+    }
+    const Sample sample = read_sample(m, first_record(version) + number * SAMPLE_RECORD_SIZE);
+    const uint32_t bytes = 2u * sample.length;
+    return jo_make_sound(m, sample.start & ~1u, bytes, sample.start & ~1u, bytes, out);
+}

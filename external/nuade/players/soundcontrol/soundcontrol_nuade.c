@@ -80,6 +80,26 @@ static void soundcontrol_metadata(void* user_data, const NuadeMetadataSink* sink
     sink->set_tag(sink->ctx, NUADE_META_FORMAT, "Sound Control");
 }
 
+static uint32_t soundcontrol_sample_count(void* user_data) {
+    return (uint32_t)sc_get_num_samples(((const SoundControlNuade*)user_data)->module);
+}
+
+static bool soundcontrol_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sc_sample_pcm(((const SoundControlNuade*)user_data)->module, (int)n, &data, &length, &loop_start,
+                       &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundcontrol = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundcontrol",
@@ -91,6 +111,8 @@ const NuadePlayer nuade_player_soundcontrol = {
     .close = soundcontrol_close,
     .start = soundcontrol_start,
     .tick = soundcontrol_tick,
+    .sample_count = soundcontrol_sample_count,
+    .sample_get = soundcontrol_sample_get,
     .metadata = soundcontrol_metadata,
     .voice_info = soundcontrol_voice_info,
     .grid_ticks = soundcontrol_grid_ticks,

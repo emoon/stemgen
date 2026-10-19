@@ -62,6 +62,23 @@ static uint32_t tfol_nuade_voice_info(void* user_data, NuadeVoiceInfo* out, uint
     return n;
 }
 
+static uint32_t tfol_nuade_sample_count(void* user_data) {
+    return tfol_instrument_count((const TfolPlayer*)user_data);
+}
+
+// Paula plays the sample in a loop: the repeat registers stay at the sample unless a second sample replaces them.
+static bool tfol_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    if (!tfol_instrument_pcm((const TfolPlayer*)user_data, n, &data, &length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = 0, .loop_frames = length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_timfollin = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "timfollin",
@@ -75,6 +92,8 @@ const NuadePlayer nuade_player_timfollin = {
     .tick = tfol_nuade_tick,
     .metadata = tfol_nuade_metadata,
     .voice_info = tfol_nuade_voice_info,
+    .sample_count = tfol_nuade_sample_count,
+    .sample_get = tfol_nuade_sample_get,
 };
 
 TfolPlayer* tfol_from_nuade(NuadeSong* song) {

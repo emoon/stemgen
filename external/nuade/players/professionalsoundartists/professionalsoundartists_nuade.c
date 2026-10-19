@@ -73,6 +73,25 @@ static uint32_t professionalsoundartists_grid_ticks(void* user_data, uint32_t su
     return psa_grid_ticks((const PsaPlayer*)user_data);
 }
 
+static uint32_t professionalsoundartists_sample_count(void* user_data) {
+    return psa_instrument_count((const PsaPlayer*)user_data);
+}
+
+static bool professionalsoundartists_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    PsaInstrumentPcm pcm;
+    if (!psa_instrument_pcm((const PsaPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = pcm.name[0] != '\0' ? pcm.name : nullptr,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_professionalsoundartists = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "professionalsoundartists",
@@ -87,6 +106,8 @@ const NuadePlayer nuade_player_professionalsoundartists = {
     .metadata = professionalsoundartists_metadata,
     .voice_info = professionalsoundartists_voice_info,
     .grid_ticks = professionalsoundartists_grid_ticks,
+    .sample_count = professionalsoundartists_sample_count,
+    .sample_get = professionalsoundartists_sample_get,
 };
 
 PsaPlayer* psa_from_nuade(NuadeSong* song) {

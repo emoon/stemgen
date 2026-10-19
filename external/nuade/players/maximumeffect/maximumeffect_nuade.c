@@ -72,6 +72,25 @@ static uint32_t maximumeffect_grid_ticks(void* user_data, uint32_t subsong) {
     return mxe_grid_ticks((const MxePlayer*)user_data);
 }
 
+static uint32_t maximumeffect_sample_count(void* user_data) {
+    return (uint32_t)mxe_instrument_count((const MxePlayer*)user_data);
+}
+
+static bool maximumeffect_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!mxe_instrument_pcm((const MxePlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_maximumeffect = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "maximumeffect",
@@ -86,6 +105,8 @@ const NuadePlayer nuade_player_maximumeffect = {
     .metadata = maximumeffect_metadata,
     .voice_info = maximumeffect_voice_info,
     .grid_ticks = maximumeffect_grid_ticks,
+    .sample_count = maximumeffect_sample_count,
+    .sample_get = maximumeffect_sample_get,
 };
 
 MxePlayer* mxe_from_nuade(NuadeSong* song) {

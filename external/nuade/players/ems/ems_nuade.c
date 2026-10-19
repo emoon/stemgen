@@ -111,6 +111,23 @@ static uint32_t ems_nuade_tracker_cells(void* user_data, const NuadePosition* at
     return nuade_tracker_fill(at, EMS_VOICES, EMS_ROWS, channel, row_lo, row_hi, out, cap, ems_nuade_cell, user_data);
 }
 
+static uint32_t ems_nuade_sample_count(void* user_data) {
+    (void)user_data;
+    return EMS_INSTRUMENTS;
+}
+
+static bool ems_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t bytes, loop_start, loop_bytes;
+    if (!ems_instrument_pcm((const EmsPlayer*)user_data, (int)n, &data, &bytes, &loop_start, &loop_bytes)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = bytes, .bits = 8, .loop_start = loop_start, .loop_frames = loop_bytes
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_ems = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "ems",
@@ -127,6 +144,8 @@ const NuadePlayer nuade_player_ems = {
     .voice_info = ems_nuade_voice_info,
     .tracker_info = ems_nuade_tracker_info,
     .tracker_cells = ems_nuade_tracker_cells,
+    .sample_count = ems_nuade_sample_count,
+    .sample_get = ems_nuade_sample_get,
 };
 
 EmsPlayer* ems_from_nuade(NuadeSong* song) {

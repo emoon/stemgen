@@ -97,6 +97,13 @@ int dsc_tempo(const DscPlayer* player);
 
 DscVoiceState dsc_voice_state(const DscPlayer* player, int voice);
 
+// The sample of sound 0 .. sound_count - 1: its bytes, the part that repeats (loop_length 0: none; the song counts the
+// repeats, then the voice falls silent) and the sample rate of its period. False for a sound without bytes inside the
+// module.
+int dsc_sound_count(const DscPlayer* player);
+bool dsc_sound_pcm(const DscPlayer* player, int sound, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length, uint32_t* rate);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DscPlayer* dsc_from_nuade(NuadeSong* song);
 

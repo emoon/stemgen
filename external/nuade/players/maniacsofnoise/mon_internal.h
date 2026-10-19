@@ -24,6 +24,17 @@
 // The bytes of an instrument record.
 #define MON_INSTRUMENT_BYTES 64
 
+// The wave lists of the instruments that play waves. Older versions: words, a wave is the address of the wave and
+// the commands take a word argument.
+#define MON_OLD_WAVE_SET_LENGTH 0xFFFD // the wave length is the word behind it
+#define MON_OLD_WAVE_SET_PERIOD 0xFFFE // the period is the word behind it
+#define MON_OLD_WAVE_JUMP 0xFFFF       // jump back by the word behind it
+#define MON_OLD_WAVE_COMMAND_BYTES 4
+#define MON_OLD_WAVE_BYTES 2
+// MonVersion_MysteryWorldsEnd: bytes, a wave is an index of the wave table
+#define MON_NEW_WAVE_SPEED 0xFE // set the speed from the byte that follows
+#define MON_NEW_WAVE_JUMP 0xFF  // jump back by the byte that follows
+
 // The loop start of an instrument that plays its sample once.
 #define MON_NO_LOOP 0xFFFF
 
@@ -48,7 +59,7 @@ uint32_t mon_u32(const MonModule* m, uint32_t address);
 bool mon_locate(const uint8_t* bytes, size_t size, MonModule* out);
 
 // Walks every voice of every song (mon_walk.c); false when one reaches a command behind the command tables.
-bool mon_walk_songs(const MonModule* m);
+bool mon_walk_songs(MonModule* m);
 
 // A word of the song data used as a signed offset from the song data (adda.w).
 uint32_t mon_song_address(const MonModule* m, uint16_t offset);

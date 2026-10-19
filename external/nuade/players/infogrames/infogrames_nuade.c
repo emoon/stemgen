@@ -75,6 +75,22 @@ static uint32_t infogrames_grid_ticks(void* user_data, uint32_t subsong) {
     return IG_GRID_TICKS;
 }
 
+static uint32_t infogrames_sample_count(void* user_data) {
+    return ig_sample_count((const IgPlayer*)user_data);
+}
+
+static bool infogrames_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!ig_sample_pcm((const IgPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_infogrames = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "infogrames",
@@ -89,6 +105,8 @@ const NuadePlayer nuade_player_infogrames = {
     .metadata = infogrames_metadata,
     .voice_info = infogrames_voice_info,
     .grid_ticks = infogrames_grid_ticks,
+    .sample_count = infogrames_sample_count,
+    .sample_get = infogrames_sample_get,
 };
 
 IgPlayer* ig_from_nuade(NuadeSong* song) {

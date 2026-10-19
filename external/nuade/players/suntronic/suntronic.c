@@ -763,6 +763,34 @@ const char* sun_format_name(const SunPlayer* player) {
     return "SUN-Tronic";
 }
 
+uint32_t sun_instrument_count(const SunPlayer* player) {
+    return player->module.synth_count;
+}
+
+bool sun_instrument_pcm(const SunPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames) {
+    const SunModule* module = &player->module;
+    if (inst >= module->synth_count) {
+        return false;
+    }
+    const SunInstrument instrument = sun_module_instrument(module, inst);
+    const uint32_t length = (uint32_t)instrument.words * 2;
+    const SunMemory* mem = &module->memory;
+    // The waveform address is an address of the replayer's memory: the module lies at SUN_MODULE_BASE.
+    if (length == 0 || instrument.wave_a < SUN_MODULE_BASE) {
+        return false;
+    }
+    const uint32_t offset = instrument.wave_a - SUN_MODULE_BASE;
+    if (offset >= mem->size || length > mem->size - offset) {
+        return false;
+    }
+    *data = (const int8_t*)mem->bytes + offset;
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = length;
+    return true;
+}
+
 SunVoiceState sun_voice_state(const SunPlayer* player, uint32_t voice) {
     const SunVoice* v = &player->voices[voice];
     return (SunVoiceState) { .period = v->period, .instrument = v->instrument };

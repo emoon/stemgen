@@ -188,6 +188,15 @@ uint32_t nuade_instrument_count(const NuadeSong* song);
 // Name of the n-th instrument the player reported (in the order reported) and its format index.
 const char* nuade_instrument_name(const NuadeSong* song, uint32_t n, uint32_t* index);
 
+// Samples
+
+// True if the song's player can export samples. False for a player whose sounds are all generated at run time.
+bool nuade_samples_supported(const NuadeSong* song);
+// How many sounds the format holds (PCM or not), 0 if not supported.
+uint32_t nuade_sample_count(NuadeSong* song);
+// The n-th sound. False if it has no PCM to export (a synth instrument, an empty slot) or `n` is out of range.
+bool nuade_sample_get(NuadeSong* song, uint32_t n, NuadeExportSample* out);
+
 #ifdef __cplusplus
 }
 #endif

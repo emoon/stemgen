@@ -183,6 +183,10 @@ bool fred_tick(FredModule* module);
 // Edit API
 int fred_get_instrument_count(const FredModule* module);
 const char* fred_get_instrument_name(const FredModule* module, int inst);
+// The PCM of a sample instrument (0-based, the number the voices report): signed 8 bit, sizes in bytes. False for a
+// pulse or blend instrument (made up while playing) and for an instrument without data.
+bool fred_instrument_pcm(const FredModule* module, int inst, const int8_t** data, uint32_t* length,
+                         uint32_t* loop_start, uint32_t* loop_length);
 float fred_get_instrument_param(const FredModule* module, int inst, const char* param);
 void fred_set_instrument_param(FredModule* module, int inst, const char* param, float value);
 size_t fred_export(const FredModule* module, uint8_t* out, size_t max_size);

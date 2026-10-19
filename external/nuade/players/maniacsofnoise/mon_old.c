@@ -12,11 +12,6 @@
 
 #define LIST_JUMP_BIT 0x80
 #define LIST_POSITION_MASK 0x7F
-#define WAVE_SET_LENGTH 0xFFFD // a wave list word: the wave length is the word behind it
-#define WAVE_SET_PERIOD 0xFFFE // the period is the word behind it
-#define WAVE_JUMP 0xFFFF       // jump back by the word behind it
-#define WAVE_COMMAND_BYTES 4
-#define WAVE_BYTES 2
 #define WAVE_KIND_RESTARTING 2 // instruments of this kind keep their wave list across notes of the same instrument
 
 static bool manages_envelope_flag(const MonPlayer* p) {
@@ -193,20 +188,20 @@ static void run_waves(MonPlayer* p, int voice, const MonInstrument* ins) {
     for (int guard = 0; guard < MON_LIST_GUARD; guard++) {
         const uint32_t entry_at = list + (uint32_t)(int32_t)(int16_t)v->wave_pos;
         const uint16_t entry = mon_u16(m, entry_at);
-        const uint16_t argument = mon_u16(m, entry_at + WAVE_BYTES);
-        if (entry == WAVE_SET_LENGTH) {
+        const uint16_t argument = mon_u16(m, entry_at + MON_OLD_WAVE_BYTES);
+        if (entry == MON_OLD_WAVE_SET_LENGTH) {
             v->wave_length = argument;
-            v->wave_pos = (uint16_t)(v->wave_pos + WAVE_COMMAND_BYTES);
-        } else if (entry == WAVE_SET_PERIOD) {
+            v->wave_pos = (uint16_t)(v->wave_pos + MON_OLD_WAVE_COMMAND_BYTES);
+        } else if (entry == MON_OLD_WAVE_SET_PERIOD) {
             v->period = argument;
-            v->wave_pos = (uint16_t)(v->wave_pos + WAVE_COMMAND_BYTES);
-        } else if (entry == WAVE_JUMP) {
+            v->wave_pos = (uint16_t)(v->wave_pos + MON_OLD_WAVE_COMMAND_BYTES);
+        } else if (entry == MON_OLD_WAVE_JUMP) {
             v->wave_pos = (uint16_t)(v->wave_pos - argument);
         } else {
             paula->len_words = v->wave_length;
             paula->lc = mon_sample(m, mon_song_address(m, entry));
             v->wave_timer = ins->wave_ticks;
-            v->wave_pos = (uint16_t)(v->wave_pos + WAVE_BYTES);
+            v->wave_pos = (uint16_t)(v->wave_pos + MON_OLD_WAVE_BYTES);
             if (v->start == MonStart_Fresh) {
                 v->start = MonStart_Idle;
                 nuade_paula_channel_dma_on(paula);

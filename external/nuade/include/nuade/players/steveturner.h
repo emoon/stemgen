@@ -18,6 +18,9 @@ extern "C" {
 #endif
 
 #define ST_VOICES 4
+// The instrument records a song can start are numbered 0 .. ST_MAX_INSTRUMENTS - 1 (a pattern byte names 0 .. 31, the
+// chain of an instrument reaches back and forth to 126).
+#define ST_MAX_INSTRUMENTS 127
 
 // The CIA clock: the timebase of ST_TICK_LENGTH.
 #define ST_TIMEBASE_HZ 709379
@@ -63,6 +66,7 @@ typedef struct StModule {
     uint32_t samples;     // long offsets of the samples from this table; a sample is its length in bytes, then data
     uint32_t calc_size;   // where the last pattern ends; 0 if the pattern scan found no end
     uint32_t subsongs;
+    bool instrument_used[ST_MAX_INSTRUMENTS]; // the instruments the songs can start, by index into the table
 } StModule;
 
 // What a voice's sequencer does on its next call.
@@ -214,6 +218,14 @@ StTickResult st_tick(StPlayer* player, NuadeVoices* voices);
 // Ticks of one step of a note's duration in a subsong (0-based); 0 for a bad subsong.
 uint32_t st_grid_ticks(const StPlayer* player, int subsong);
 StVoiceState st_voice_state(const StPlayer* player, int voice);
+
+// The instrument records a song can start (what st_voice_state numbers; the count runs to the
+// last one), and the sample one
+// plays (8 bit; it repeats as a whole when the instrument has passes of the envelope). False for an instrument the
+// songs never start or one without a sample.
+uint32_t st_instrument_count(const StPlayer* player);
+bool st_instrument_pcm(const StPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 StPlayer* st_from_nuade(NuadeSong* song);

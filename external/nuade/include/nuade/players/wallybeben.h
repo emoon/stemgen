@@ -193,13 +193,14 @@ typedef struct WbModule {
     uint32_t code_end;     // the rts in front of the period table
     uint32_t period_count; // words of the period table
     uint32_t pattern_count;
-    uint32_t sample_count; // longs of the sample table
-    uint32_t* song_seq;    // song_limit - 1 songs of 4 sequence lists: module offsets
-    uint32_t* pattern_ptr; // module offsets
-    uint32_t* sample_ptr;  // module offsets
-    uint32_t silence_ptr;  // WbLoop_FlagSilence builds
-    uint32_t voice_bytes;  // size of the voice records: the last field (0x80) is only there in builds that use it
-    uint32_t var_lo;       // the replayer's variables lie in [var_lo, var_hi)
+    uint32_t sample_count;     // longs of the sample table
+    uint32_t instrument_count; // records of the instrument table the eagleplayer counts
+    uint32_t* song_seq;        // song_limit - 1 songs of 4 sequence lists: module offsets
+    uint32_t* pattern_ptr;     // module offsets
+    uint32_t* sample_ptr;      // module offsets
+    uint32_t silence_ptr;      // WbLoop_FlagSilence builds
+    uint32_t voice_bytes;      // size of the voice records: the last field (0x80) is only there in builds that use it
+    uint32_t var_lo;           // the replayer's variables lie in [var_lo, var_hi)
     uint32_t var_hi;
 } WbModule;
 
@@ -310,6 +311,13 @@ bool wb_start(WbPlayer* player, uint32_t subsong, NuadeVoices* voices);
 WbTickResult wb_tick(WbPlayer* player, NuadeVoices* voices);
 
 WbVoiceState wb_voice_state(const WbPlayer* player, uint32_t voice);
+
+// The instruments a song can name (the records of the instrument table).
+uint32_t wb_instrument_count(const WbPlayer* player);
+// The PCM of instrument `index` (the record number, as WbVoiceState.instrument): its sample as the replayer hands it to
+// Paula, bytes. False for an index past the instrument table or a sample outside the module.
+bool wb_instrument_pcm(const WbPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 WbPlayer* wb_from_nuade(NuadeSong* song);

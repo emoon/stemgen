@@ -114,6 +114,18 @@ uint32_t kh_first_prepared_instrument(const KhVariant* variant);
 
 bool kh_prepare_instruments(KhMemory* memory, uint32_t song, uint32_t first, uint64_t* budget);
 
+// The sound of an 8SVX instrument: its largest octave, in the song's memory.
+typedef struct KhSound {
+    const int8_t* data;
+    uint32_t length;
+    uint32_t loop_start;
+    uint32_t loop_length;
+} KhSound;
+
+// The instrument tables of the subsongs, read from the song as loaded: the song start only prepares a copy of it.
+uint32_t kh_module_instrument_count(const KhModule* module);
+bool kh_module_instrument_sound(const KhModule* module, uint32_t index, KhSound* out);
+
 // Layout of the first hunk of a song file (the eagleplayer's Check2).
 typedef enum KhLayout {
     KhLayout_None = 0,

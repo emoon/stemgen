@@ -64,6 +64,23 @@ static uint32_t paulshields_voice_info(void* user_data, NuadeVoiceInfo* out, uin
     return count;
 }
 
+static uint32_t paulshields_sample_count(void* user_data) {
+    return psh_sample_count((const PshPlayer*)user_data);
+}
+
+static bool paulshields_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const PshPlayer* player = (const PshPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!psh_sample_pcm(player, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_paulshields = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "paulshields",
@@ -77,6 +94,8 @@ const NuadePlayer nuade_player_paulshields = {
     .tick = paulshields_tick,
     .metadata = paulshields_metadata,
     .voice_info = paulshields_voice_info,
+    .sample_count = paulshields_sample_count,
+    .sample_get = paulshields_sample_get,
 };
 
 PshPlayer* psh_from_nuade(NuadeSong* song) {

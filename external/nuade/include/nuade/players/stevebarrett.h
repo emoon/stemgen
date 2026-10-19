@@ -184,6 +184,12 @@ SbrTickResult sbr_tick(SbrPlayer* player, NuadeVoices* voices);
 const char* sbr_format_name(const SbrPlayer* player);
 SbrVoiceState sbr_voice_state(const SbrPlayer* player, uint32_t voice);
 
+// The sample table the init built, and the PCM of an entry (8 bit). The repeat comes from the first wave record that
+// names the sample and has one. False for an empty entry.
+uint32_t sbr_instrument_count(const SbrPlayer* player);
+bool sbr_instrument_pcm(const SbrPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SbrPlayer* sbr_from_nuade(NuadeSong* song);
 

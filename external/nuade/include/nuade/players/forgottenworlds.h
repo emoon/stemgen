@@ -113,6 +113,13 @@ FwTickResult fw_tick(FwPlayer* player, NuadeVoices* voices);
 
 FwVoiceState fw_voice_state(const FwPlayer* player, int voice);
 
+// The instruments of the module (the records up to the sample table) and the PCM of one, signed 8 bit, sizes in bytes,
+// from the file as loaded. A sound is its first block plus its repeat block when that lies in or directly after the
+// first. False for an instrument without data. Two instruments may name the same sample.
+uint32_t fw_instrument_count(const FwPlayer* player);
+bool fw_instrument_pcm(const FwPlayer* player, uint32_t number, const int8_t** data, uint32_t* bytes,
+                       uint32_t* loop_start, uint32_t* loop_bytes);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 FwPlayer* fw_from_nuade(NuadeSong* song);
 

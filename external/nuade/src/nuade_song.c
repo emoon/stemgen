@@ -954,3 +954,20 @@ const char* nuade_instrument_name(const NuadeSong* song, uint32_t n, uint32_t* i
     }
     return song->instruments[n].name;
 }
+
+bool nuade_samples_supported(const NuadeSong* song) {
+    return song != nullptr && song->player->sample_count != nullptr && song->player->sample_get != nullptr;
+}
+
+uint32_t nuade_sample_count(NuadeSong* song) {
+    return nuade_samples_supported(song) ? song->player->sample_count(song->user_data) : 0;
+}
+
+bool nuade_sample_get(NuadeSong* song, uint32_t n, NuadeExportSample* out) {
+    if (!nuade_samples_supported(song) || n >= song->player->sample_count(song->user_data)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { 0 };
+    return song->player->sample_get(song->user_data, n, out) && out->data != nullptr && out->frames != 0
+        && (out->bits == 8 || out->bits == 16);
+}

@@ -244,6 +244,12 @@ bool bd_tick(BdModule* module);
 // The note and sample index of the latest start on a voice; false before the first one.
 bool bd_voice_started(const BdModule* module, uint32_t voice, int32_t* note, int32_t* instrument);
 
+// The samples of the module (numbered as bd_voice_started reports instruments), and the PCM of one, in bytes: the part
+// played first and the repeat that follows it. False for a sample without data.
+uint32_t bd_sample_count(const BdModule* module);
+bool bd_sample_pcm(const BdModule* module, uint32_t sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 BdModule* bd_from_nuade(NuadeSong* song);
 

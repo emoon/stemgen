@@ -242,6 +242,12 @@ uint32_t dw_subsong_speed(const DwModule* module, int subsong);
 // The note and sample number of the last sample start on a voice (-1 before the first). False for a bad voice.
 bool dw_voice_started(const DwModule* module, int voice, int* note, int* instrument);
 
+// The sample with number 0 .. dw_sample_count - 1, as the song's samples hold it. False for an empty sample and for the
+// square waveform sample, which the player overwrites with a generated wave when a song starts.
+int dw_sample_count(const DwModule* module);
+bool dw_sample_pcm(const DwModule* module, int sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DwModule* dw_from_nuade(NuadeSong* song);
 

@@ -82,6 +82,35 @@ static const int8_t* sample_data(const Sa1Player* p, uint32_t offset) {
     return (const int8_t*)p->module.data + offset;
 }
 
+bool sa1_sample_pcm(const Sa1Player* player, int sample, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                    uint32_t* loop_frames) {
+    if (sample < 0 || sample >= SA1_SAMPLES) {
+        return false;
+    }
+    const Sa1Module* m = &player->module;
+    const Sa1Sample* s = &m->samples[sample];
+    // What a note with an envelope plays: the one shot part and the repeat part behind it.
+    if (!s->plain_valid || s->start_len_words == 0 || s->start >= m->size) {
+        return false;
+    }
+    uint32_t length = (uint32_t)s->start_len_words * 2;
+    if (length > m->size - s->start) {
+        length = (uint32_t)(m->size - s->start);
+    }
+    *data = sample_data(player, s->start);
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    if (s->has_repeat && s->repeat_len_words > 1 && s->repeat >= s->start && s->repeat - s->start < length) {
+        *loop_start = s->repeat - s->start;
+        *loop_frames = (uint32_t)s->repeat_len_words * 2;
+        if (*loop_frames > length - *loop_start) {
+            *loop_frames = length - *loop_start;
+        }
+    }
+    return true;
+}
+
 // A note with an envelope starts at volume 0 and rises; with a high nibble of 0 it starts at 64 and only falls.
 
 static void start_envelope(Sa1Voice* voice, Sa1Cell cell) {

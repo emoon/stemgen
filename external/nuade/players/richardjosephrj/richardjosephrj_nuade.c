@@ -75,6 +75,24 @@ static uint32_t richardjosephrj_grid_ticks(void* user_data, uint32_t subsong) {
     return rjg_grid_ticks((const RjgPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t richardjosephrj_sample_count(void* user_data) {
+    return (uint32_t)rjg_instrument_count((const RjgPlayer*)user_data);
+}
+
+static bool richardjosephrj_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    RjgInstrumentPcm pcm;
+    if (!rjg_instrument_pcm((const RjgPlayer*)user_data, (int)n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = pcm.data,
+                                 .frames = pcm.frames,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_richardjosephrj = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "richardjosephrj",
@@ -89,6 +107,8 @@ const NuadePlayer nuade_player_richardjosephrj = {
     .metadata = richardjosephrj_metadata,
     .voice_info = richardjosephrj_voice_info,
     .grid_ticks = richardjosephrj_grid_ticks,
+    .sample_count = richardjosephrj_sample_count,
+    .sample_get = richardjosephrj_sample_get,
 };
 
 RjgPlayer* rjg_from_nuade(NuadeSong* song) {

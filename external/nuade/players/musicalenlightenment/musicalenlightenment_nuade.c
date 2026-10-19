@@ -128,6 +128,23 @@ static uint32_t musicalenlightenment_tracker_cells(void* user_data, const NuadeP
                               user_data);
 }
 
+static uint32_t musicalenlightenment_sample_count(void* user_data) {
+    (void)user_data;
+    return TME_INSTRUMENTS;
+}
+
+static bool musicalenlightenment_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!tme_instrument_pcm((const TmePlayer*)user_data, n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_musicalenlightenment = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "musicalenlightenment",
@@ -144,6 +161,8 @@ const NuadePlayer nuade_player_musicalenlightenment = {
     .voice_info = musicalenlightenment_voice_info,
     .tracker_info = musicalenlightenment_tracker_info,
     .tracker_cells = musicalenlightenment_tracker_cells,
+    .sample_count = musicalenlightenment_sample_count,
+    .sample_get = musicalenlightenment_sample_get,
 };
 
 TmePlayer* tme_from_nuade(NuadeSong* song) {

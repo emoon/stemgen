@@ -155,6 +155,7 @@ struct SfModule {
     // Original instruments (keyed by offset)
     SfInstrument original_instruments[SF_MAX_INSTRUMENTS];
     uint32_t original_instrument_offsets[SF_MAX_INSTRUMENTS];
+    uint8_t original_instrument_numbers[SF_MAX_INSTRUMENTS]; // the sound table number a DefineInstrument gives it
     int num_original_instruments;
 
     // Playing state
@@ -200,6 +201,10 @@ bool sf_voice_last_note(const SfModule* module, int channel, int* note, int* ins
 
 // Edit API
 int sf_get_instrument_count(const SfModule* module);
+// The waveform of instrument definition `n` (0 to sf_get_instrument_count - 1) as the song plays it: `number` is the
+// sound number the song uses it by. False when the definition holds no data.
+bool sf_instrument_pcm(const SfModule* module, int n, uint32_t* number, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames);
 float sf_get_instrument_param(const SfModule* module, int inst, const char* param);
 void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value);
 size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size);

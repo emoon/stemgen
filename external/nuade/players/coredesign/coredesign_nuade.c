@@ -85,6 +85,22 @@ static uint32_t coredesign_grid_ticks(void* user_data, uint32_t subsong) {
     return CD_GRID_TICKS;
 }
 
+static uint32_t coredesign_sample_count(void* user_data) {
+    return (uint32_t)cd_instrument_count((const CdPlayer*)user_data);
+}
+
+static bool coredesign_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!cd_instrument_pcm((const CdPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_coredesign = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "coredesign",
@@ -99,6 +115,8 @@ const NuadePlayer nuade_player_coredesign = {
     .metadata = coredesign_metadata,
     .voice_info = coredesign_voice_info,
     .grid_ticks = coredesign_grid_ticks,
+    .sample_count = coredesign_sample_count,
+    .sample_get = coredesign_sample_get,
 };
 
 CdPlayer* cd_from_nuade(NuadeSong* song) {

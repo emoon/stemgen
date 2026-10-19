@@ -75,6 +75,23 @@ static uint32_t fredgray_grid_ticks(void* user_data, uint32_t subsong) {
     return FG_GRID_TICKS;
 }
 
+static uint32_t fredgray_sample_count(void* user_data) {
+    return fg_sound_count((const FgPlayer*)user_data);
+}
+
+static bool fredgray_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    uint32_t number, bytes;
+    const int8_t* data;
+    bool loops;
+    if (!fg_sound_pcm((const FgPlayer*)user_data, n, &number, &data, &bytes, &loops)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = number, .data = data, .frames = bytes, .bits = 8, .loop_frames = loops ? bytes : 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_fredgray = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "fredgray",
@@ -89,6 +106,8 @@ const NuadePlayer nuade_player_fredgray = {
     .metadata = fredgray_metadata,
     .voice_info = fredgray_voice_info,
     .grid_ticks = fredgray_grid_ticks,
+    .sample_count = fredgray_sample_count,
+    .sample_get = fredgray_sample_get,
 };
 
 FgPlayer* fg_from_nuade(NuadeSong* song) {

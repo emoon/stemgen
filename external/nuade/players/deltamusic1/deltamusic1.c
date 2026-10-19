@@ -10,7 +10,6 @@
 #include <string.h>
 
 #define DM1_CHANNELS 4
-#define DM1_INSTRUMENTS 20
 #define DM1_HEADER_SIZE 104
 #define DM1_TABLE_SIZE 48
 #define DM1_MARK "ALL "
@@ -1016,4 +1015,62 @@ Dm1Cell dm1_cell(const Dm1Module* module, int order, int voice, int row) {
     cell.effect = line->effect;
     cell.effect_arg = line->effect_arg;
     return cell;
+}
+
+// The wave the sound table of a synth instrument starts with, as an offset into the sound data: the first entry that
+// is not a delay change, following the jumps.
+static bool first_table_wave(const uint8_t* table, uint32_t* offset) {
+    uint32_t position = 0;
+    for (int steps = 0; steps < 2 * DM1_TABLE_SIZE; steps++) {
+        const uint8_t data = table[position];
+        if (data == 0xff)
+            position = position + 1 < DM1_TABLE_SIZE ? table[position + 1] : 0;
+        else if (data >= 0x80)
+            position++;
+        else {
+            *offset = (uint32_t)data * 32;
+            return true;
+        }
+        if (position >= DM1_TABLE_SIZE)
+            position = 0;
+    }
+    return false;
+}
+
+bool dm1_instrument_pcm(const Dm1Module* module, int instrument, const int8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length) {
+    if (!module || instrument < 0 || instrument >= DM1_INSTRUMENTS)
+        return false;
+    const Dm1Instrument* inst = module->backup_instruments[instrument];
+    if (inst == nullptr || inst->sample_data == nullptr || inst->sample_data_size == 0)
+        return false;
+    uint32_t start = 0;
+    uint32_t played = inst->sample_length;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (!inst->is_sample) {
+        // a synth instrument starts with one wave of its bank, which Paula repeats
+        if (!first_table_wave(inst->table, &start))
+            return false;
+        *loop_length = inst->sample_length;
+    } else if (inst->repeat_length > 1) {
+        // the voice plays up to the end of the loop when there is one
+        played = (uint32_t)inst->repeat_start + inst->repeat_length;
+        *loop_start = inst->repeat_start;
+        *loop_length = inst->repeat_length;
+    }
+    if (start >= inst->sample_data_size)
+        return false;
+    if (played > inst->sample_data_size - start) {
+        played = inst->sample_data_size - start;
+        if (*loop_start >= played || (!inst->is_sample && *loop_length > played)) {
+            *loop_start = 0;
+            *loop_length = 0;
+        } else if (*loop_length > played - *loop_start) {
+            *loop_length = played - *loop_start;
+        }
+    }
+    *data = inst->sample_data + start;
+    *length = played;
+    return played != 0;
 }

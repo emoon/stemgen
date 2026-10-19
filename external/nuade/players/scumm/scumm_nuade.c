@@ -66,6 +66,25 @@ static uint32_t scumm_nuade_grid_ticks(void* user_data, uint32_t subsong) {
     return SCUMM_GRID_TICKS;
 }
 
+static uint32_t scumm_nuade_sample_count(void* user_data) {
+    return scumm_instrument_count((const ScummPlayer*)user_data);
+}
+
+static bool scumm_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!scumm_instrument_pcm((const ScummPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = frames,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_frames };
+    return true;
+}
+
 const NuadePlayer nuade_player_scumm = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "scumm",
@@ -80,6 +99,8 @@ const NuadePlayer nuade_player_scumm = {
     .metadata = scumm_nuade_metadata,
     .voice_info = scumm_nuade_voice_info,
     .grid_ticks = scumm_nuade_grid_ticks,
+    .sample_count = scumm_nuade_sample_count,
+    .sample_get = scumm_nuade_sample_get,
 };
 
 ScummPlayer* scumm_from_nuade(NuadeSong* song) {

@@ -327,7 +327,7 @@ bool mk2_step(const Mk2Module* module, uint32_t offset, Mk2Step* out) {
 }
 
 bool mk2_instrument(const Mk2Module* module, uint32_t sample, Mk2Instrument* out) {
-    const uint32_t base = module->layout->instruments + sample * 8u;
+    const uint32_t base = module->layout->instruments + sample * MK2_INSTRUMENT_BYTES;
     uint16_t length = 0;
     if (!read_long(module, base, &out->offset) || !read_word(module, base + 6, &length)) {
         return false;

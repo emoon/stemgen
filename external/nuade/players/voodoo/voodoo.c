@@ -168,6 +168,11 @@ static VsTable* vs_get_table(VsModule* m, int idx) {
     return nullptr;
 }
 
+VsWaveform* vs_sample_waveform(const VsModule* m, int number) {
+    const VsSampleRef* ref = &m->all_samples[number];
+    return &m->subsongs[ref->song].data[ref->data_idx].u.waveform;
+}
+
 static VsWaveform* vs_get_waveform(VsModule* m, int idx) {
     VsModuleData* d = vs_get_data(m, idx);
     if (d && (d->type == VS_DATA_WAVEFORM))
@@ -742,7 +747,8 @@ static bool load_module(VsModule* m, const uint8_t* data, size_t size) {
     return true;
 }
 
-// Find sample number (index into all_samples ordering)
+// The sample numbers: every waveform of the file (the single-cycle waveforms and the samples) numbered by its offset in
+// the file, whichever subsong uses it, so that a number means the same sound in every subsong.
 
 static int16_t find_sample_number(VsModule* m, int waveform_idx) {
     if (!m->current_song)
@@ -753,64 +759,59 @@ static int16_t find_sample_number(VsModule* m, int waveform_idx) {
 
     int target_offset = d->u.waveform.offset;
 
-    // Linear search through all waveforms in data order
     for (int i = 0; i < m->num_all_samples; i++) {
-        int idx = m->all_sample_indices[i];
-        VsModuleData* sd = vs_get_data(m, idx);
-        if (sd && sd->type == VS_DATA_WAVEFORM && sd->u.waveform.offset == target_offset)
+        if (vs_sample_waveform(m, i)->offset == target_offset)
             return (int16_t)i;
     }
 
     return -1;
 }
 
-// Build all_samples index for current song
+static int compare_sample_refs(const void* a, const void* b) {
+    const VsSampleRef* ra = (const VsSampleRef*)a;
+    const VsSampleRef* rb = (const VsSampleRef*)b;
+    if (ra->offset != rb->offset)
+        return ra->offset < rb->offset ? -1 : 1;
+    return ra->song - rb->song;
+}
 
-static void build_all_samples(VsModule* m) {
-    if (m->all_sample_indices) {
-        free(m->all_sample_indices);
-        m->all_sample_indices = nullptr;
-    }
-    m->num_all_samples = 0;
+// Build the numbering of the waveforms of all subsongs: sorted by offset, an offset once.
 
-    if (!m->current_song)
-        return;
-
-    // Count waveforms
+static bool build_all_samples(VsModule* m) {
     int count = 0;
-    for (int i = 0; i < m->current_song->data_count; i++) {
-        if (m->current_song->data[i].type == VS_DATA_WAVEFORM)
-            count++;
-    }
-
-    m->all_sample_indices = (int*)malloc(count * sizeof(int));
-    int idx = 0;
-    for (int i = 0; i < m->current_song->data_count; i++) {
-        if (m->current_song->data[i].type == VS_DATA_WAVEFORM)
-            m->all_sample_indices[idx++] = i;
-    }
-    m->num_all_samples = count;
-
-    // Sort by offset (stable ordering)
-    for (int i = 0; i < count - 1; i++) {
-        for (int j = i + 1; j < count; j++) {
-            int oi = m->current_song->data[m->all_sample_indices[i]].u.waveform.offset;
-            int oj = m->current_song->data[m->all_sample_indices[j]].u.waveform.offset;
-            if (oj < oi) {
-                int tmp = m->all_sample_indices[i];
-                m->all_sample_indices[i] = m->all_sample_indices[j];
-                m->all_sample_indices[j] = tmp;
-            }
+    for (int s = 0; s < m->num_subsongs; s++) {
+        for (int i = 0; i < m->subsongs[s].data_count; i++) {
+            if (m->subsongs[s].data[i].type == VS_DATA_WAVEFORM)
+                count++;
         }
     }
+
+    m->all_samples = (VsSampleRef*)malloc((count > 0 ? (size_t)count : 1) * sizeof(VsSampleRef));
+    if (!m->all_samples)
+        return false;
+    int n = 0;
+    for (int s = 0; s < m->num_subsongs; s++) {
+        for (int i = 0; i < m->subsongs[s].data_count; i++) {
+            const VsModuleData* d = &m->subsongs[s].data[i];
+            if (d->type == VS_DATA_WAVEFORM)
+                m->all_samples[n++] = (VsSampleRef) { .song = s, .data_idx = i, .offset = d->u.waveform.offset };
+        }
+    }
+    qsort(m->all_samples, (size_t)n, sizeof(VsSampleRef), compare_sample_refs);
+
+    int unique = 0;
+    for (int i = 0; i < n; i++) {
+        if (unique == 0 || m->all_samples[unique - 1].offset != m->all_samples[i].offset)
+            m->all_samples[unique++] = m->all_samples[i];
+    }
+    m->num_all_samples = unique;
+    return true;
 }
 
 // Initialize sound
 
 static void initialize_sound(VsModule* m, int subsong) {
     m->current_song = &m->subsongs[subsong];
-
-    build_all_samples(m);
 
     for (int i = 0; i < 4; i++) {
         VsVoiceInfo* v = &m->voices[i];
@@ -1664,7 +1665,7 @@ VsModule* vs_create(const uint8_t* data, size_t size) {
         m->original_size = size;
     }
 
-    if (!load_module(m, data, size)) {
+    if (!load_module(m, data, size) || !build_all_samples(m)) {
         vs_destroy(m);
         return nullptr;
     }
@@ -1688,7 +1689,7 @@ void vs_destroy(VsModule* module) {
         free(module->subsongs);
     }
 
-    free(module->all_sample_indices);
+    free(module->all_samples);
     if (module->original_data)
         free(module->original_data);
     free(module);
@@ -1742,16 +1743,23 @@ int vs_get_instrument_count(const VsModule* module) {
     return module ? module->num_all_samples : 0;
 }
 
+bool vs_sample_pcm(const VsModule* module, int number, const int8_t** data, uint32_t* length, bool* loops) {
+    if (!module || number < 0 || number >= module->num_all_samples)
+        return false;
+    const VsWaveform* wf = vs_sample_waveform(module, number);
+    if (wf->data == nullptr || wf->data_length <= 0)
+        return false;
+    *data = wf->data;
+    *length = (uint32_t)wf->data_length;
+    // the voice repeats a waveform; a sample is scanned through in windows of a waveform
+    *loops = !wf->is_sample;
+    return true;
+}
+
 float vs_get_instrument_param(const VsModule* module, int inst, const char* param) {
-    if (!module || !module->current_song || inst < 0 || inst >= module->num_all_samples || !param)
+    if (!module || inst < 0 || inst >= module->num_all_samples || !param)
         return -1.0f;
-    int data_idx = module->all_sample_indices[inst];
-    if (data_idx < 0 || data_idx >= module->current_song->data_count)
-        return -1.0f;
-    const VsModuleData* md = &module->current_song->data[data_idx];
-    if (md->type != VS_DATA_WAVEFORM)
-        return -1.0f;
-    const VsWaveform* wf = &md->u.waveform;
+    const VsWaveform* wf = vs_sample_waveform(module, inst);
 
     if (strcmp(param, "isSample") == 0)
         return (float)wf->is_sample;
@@ -1766,15 +1774,9 @@ float vs_get_instrument_param(const VsModule* module, int inst, const char* para
 }
 
 void vs_set_instrument_param(VsModule* module, int inst, const char* param, float value) {
-    if (!module || !module->current_song || inst < 0 || inst >= module->num_all_samples || !param)
+    if (!module || inst < 0 || inst >= module->num_all_samples || !param)
         return;
-    int data_idx = module->all_sample_indices[inst];
-    if (data_idx < 0 || data_idx >= module->current_song->data_count)
-        return;
-    VsModuleData* md = &module->current_song->data[data_idx];
-    if (md->type != VS_DATA_WAVEFORM)
-        return;
-    VsWaveform* wf = &md->u.waveform;
+    VsWaveform* wf = vs_sample_waveform(module, inst);
 
     if (strcmp(param, "sampleLength") == 0) {
         wf->sample_length = (uint16_t)value;

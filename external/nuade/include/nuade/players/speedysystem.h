@@ -111,6 +111,11 @@ uint32_t ss_grid_ticks(const SsPlayer* player);
 
 SsVoiceState ss_voice_state(const SsPlayer* player, int voice);
 
+// The PCM of sample 0..SS_SAMPLES-1: the one shot part and the repeat part behind it (the loop; 8 bit). False for an
+// empty entry.
+bool ss_sample_pcm(const SsPlayer* player, int sample, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SsPlayer* ss_from_nuade(NuadeSong* song);
 

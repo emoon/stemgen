@@ -108,6 +108,12 @@ uint32_t e6_module_wave_data(const Ems6Module* m, uint32_t instrument) {
     return instrument_start(m, instrument) + WAVETABLE_HEADER;
 }
 
+uint32_t e6_module_instrument_count(const Ems6Module* m) {
+    // the table of offsets is followed at once by the first instrument's data
+    const uint32_t count = e6_module_u32(m, m->instruments) / 4;
+    return count < E6_INSTRUMENT_LIMIT ? count : E6_INSTRUMENT_LIMIT;
+}
+
 uint8_t e6_module_arpeggio_entry(const Ems6Module* m, uint32_t table, uint32_t pos) {
     const uint32_t list = m->arpeggios + e6_module_u32(m, m->arpeggios + table * 4);
     return e6_module_u8(m, list + pos);
@@ -283,4 +289,30 @@ Ems6TrackState ems6_track_state(const Ems6Player* player, uint32_t track) {
 
 uint32_t ems6_track_count(const Ems6Player* player) {
     return player->used_tracks;
+}
+
+uint32_t ems6_instrument_count(const Ems6Player* player) {
+    return e6_module_instrument_count(&player->module);
+}
+
+bool ems6_instrument_pcm(const Ems6Player* player, uint32_t inst, const int8_t** data, uint32_t* length,
+                         uint32_t* loop_start, uint32_t* loop_length) {
+    const Ems6Module* m = &player->module;
+    if (inst >= e6_module_instrument_count(m)) {
+        return false;
+    }
+    E6Sample sample = e6_module_sample(m, inst);
+    if (sample.kind == E6SampleKind_Wavetable) {
+        // the player sweeps over the waves that follow the header: all of them are the instrument
+        const uint32_t end = instrument_start(m, inst + 1);
+        sample.length = end > sample.data ? (end - sample.data) / sample.loop_length * sample.loop_length : 0;
+    }
+    if (sample.data >= m->size || sample.length == 0 || sample.length > m->size - sample.data) {
+        return false;
+    }
+    *data = (const int8_t*)m->data + sample.data;
+    *length = sample.length;
+    *loop_start = sample.kind == E6SampleKind_Raw ? 0 : sample.loop_start;
+    *loop_length = sample.kind == E6SampleKind_Raw ? 0 : sample.loop_length;
+    return true;
 }

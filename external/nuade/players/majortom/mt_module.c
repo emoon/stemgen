@@ -110,6 +110,24 @@ uint32_t mt_waveform_offset(uint8_t number) {
     return MtTable_Waveforms + (uint32_t)number * MT_WAVE_BYTES;
 }
 
+bool mt_waveform_pcm(const MtModule* module, uint8_t number, const int8_t** data, uint32_t* frames) {
+    const uint32_t offset = mt_waveform_offset(number);
+    // the waveforms end where the patterns start; a number above is not a waveform
+    if (module == nullptr || offset + MT_WAVE_BYTES > MtTable_Patterns || offset + MT_WAVE_BYTES > module->size) {
+        return false;
+    }
+    bool silent = true;
+    for (uint32_t i = 0; i < MT_WAVE_BYTES; i++) {
+        silent = silent && module->bytes[offset + i] == 0;
+    }
+    if (silent) {
+        return false;
+    }
+    *data = (const int8_t*)module->bytes + offset;
+    *frames = MT_WAVE_BYTES;
+    return true;
+}
+
 MtCell mt_row(const MtModule* module, uint8_t pattern, uint32_t row, int voice, bool* unmapped) {
     const int16_t pattern_offset = (int16_t)(uint16_t)((uint32_t)pattern * MT_PATTERN_BYTES);
     const int64_t cell

@@ -256,6 +256,14 @@ FgTickResult fg_tick(FgPlayer* player, NuadeVoices* voices);
 
 FgVoiceState fg_voice_state(const FgPlayer* player, int voice);
 
+// The sounds of the module and the PCM of sound `n` (0 .. fg_sound_count - 1): the 16 byte waves a command picks, the
+// 256 byte kick sample, the noise wave. Signed 8 bit; `number` is the offset in the module image, which is what the
+// voices report as their instrument. False for a sound without data: a silent wave, the noise wave (made up every
+// tick). `loops` is whether the channel repeats the data. The data is the module as loaded.
+uint32_t fg_sound_count(const FgPlayer* player);
+bool fg_sound_pcm(const FgPlayer* player, uint32_t n, uint32_t* number, const int8_t** data, uint32_t* bytes,
+                  bool* loops);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 FgPlayer* fg_from_nuade(NuadeSong* song);
 

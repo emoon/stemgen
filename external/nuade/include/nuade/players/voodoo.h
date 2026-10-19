@@ -147,6 +147,13 @@ typedef struct VsPaulaChannel {
     NuadeSample loop;
 } VsPaulaChannel;
 
+// A waveform of the file: where it is in the data of its first subsong. The sample number is its place in the list.
+typedef struct VsSampleRef {
+    int song;
+    int data_idx;
+    int offset; // file offset
+} VsSampleRef;
+
 struct VsModule {
     // Original file data for export
     uint8_t* original_data;
@@ -155,9 +162,9 @@ struct VsModule {
     int num_subsongs;
     VsSongInfo* subsongs;
 
-    // All waveforms for sample numbering
+    // All waveforms of all subsongs for sample numbering (sorted by file offset)
     int num_all_samples;
-    int* all_sample_indices; // indices into current song data
+    VsSampleRef* all_samples;
 
     // Current song
     VsSongInfo* current_song;
@@ -187,6 +194,14 @@ bool vs_start(VsModule* module, int subsong, NuadeVoices* voices);
 bool vs_tick(VsModule* module);
 
 VsVoiceState vs_voice_state(const VsModule* module, int channel);
+
+// The waveform with sample number `number` (0 .. num_all_samples - 1), which is VsVoiceState.instrument.
+VsWaveform* vs_sample_waveform(const VsModule* module, int number);
+
+// The PCM of the waveform with sample number `number`: a single-cycle waveform or a sample, as the file holds it
+// (bytes, signed 8 bit). A waveform loops over its whole length; a sample plays once. False for a number outside the
+// list or an empty waveform.
+bool vs_sample_pcm(const VsModule* module, int number, const int8_t** data, uint32_t* length, bool* loops);
 
 // Edit API
 int vs_get_instrument_count(const VsModule* module);

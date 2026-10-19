@@ -182,6 +182,13 @@ SdrTickResult sdr_tick(SdrPlayer* player, NuadeVoices* voices);
 
 SdrVoiceState sdr_voice_state(const SdrPlayer* player, int voice);
 
+// The instrument records (what sdr_voice_state numbers) and the sample one plays, from the song's sample file (8 bit;
+// the first part, then the repeat part that follows it). False for a synthesised waveform, a junk record or a sample
+// that does not lie in the sample file.
+uint32_t sdr_instrument_count(const SdrPlayer* player);
+bool sdr_instrument_pcm(const SdrPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SdrPlayer* sdr_from_nuade(NuadeSong* song);
 

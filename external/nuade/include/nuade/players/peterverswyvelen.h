@@ -123,6 +123,12 @@ uint32_t pv_grid_ticks(const PvPlayer* player);
 
 PvVoiceState pv_voice_state(const PvPlayer* player, uint32_t voice);
 
+// The sample of an instrument (0-based, as PvVoiceState.instrument has it) as the replayer plays it: 8-bit data inside
+// the player's copy of the module (the first four bytes cleared as InitSound does), the length played before the
+// repeat takes over and the repeat in bytes (length 0: no loop). False for an empty sample.
+bool pv_sample_pcm(const PvPlayer* player, uint32_t index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 PvPlayer* pv_from_nuade(NuadeSong* song);
 

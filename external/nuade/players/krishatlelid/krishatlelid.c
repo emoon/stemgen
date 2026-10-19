@@ -602,3 +602,20 @@ uint16_t kh_voice_period(const KhPlayer* player, uint32_t voice) {
 int32_t kh_voice_instrument(const KhPlayer* player, uint32_t voice) {
     return player->voices[voice].instrument_index;
 }
+
+uint32_t kh_instrument_count(const KhPlayer* player) {
+    return kh_module_instrument_count(&player->module);
+}
+
+bool kh_instrument_pcm(const KhPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length) {
+    KhSound sound;
+    if (!kh_module_instrument_sound(&player->module, index, &sound)) {
+        return false;
+    }
+    *data = sound.data;
+    *length = sound.length;
+    *loop_start = sound.loop_start;
+    *loop_length = sound.loop_length;
+    return true;
+}

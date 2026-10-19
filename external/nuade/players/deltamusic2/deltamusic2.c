@@ -31,7 +31,6 @@
 
 #define DM2_BLOCK_BYTES 64 // 16 rows of 4 bytes
 #define DM2_ROW_MASK 0x3f
-#define DM2_INSTRUMENT_COUNT 127 // words of the instrument offset table
 
 // Instrument record (in the image, $ is the offset in the record).
 #define INST_LENGTH 0x00        // sound length in words
@@ -43,6 +42,7 @@
 #define INST_SAMPLE_FLAG 0x26 // top bit set: a sample instrument
 #define INST_INDEX 0x27       // sample number (low 3 bits) or sound table delay
 #define INST_SOUND_TABLE 0x28
+#define INST_SIZE 0x58
 
 #define NO_BUFFER 0xffffffffu // the buffer Paula's address registers hold after reset
 
@@ -87,7 +87,7 @@ static void locate_song(const Dm2Module* m, Dm2Vars* v) {
     v->blocks = p;
     p += block_bytes;
     v->inst_offsets = p;
-    p += 2 * DM2_INSTRUMENT_COUNT;
+    p += 2 * DM2_INSTRUMENTS;
     const uint32_t inst_bytes = rd16(m, p);
     p += 2;
     v->inst_base = p;
@@ -589,7 +589,7 @@ int dm2_order_count(const Dm2Module* module) {
 static int current_instrument(const Dm2Module* module, const Dm2Voice* v) {
     if (v->shown_instrument >= 0)
         return v->shown_instrument;
-    for (uint32_t n = 1; n <= DM2_INSTRUMENT_COUNT; n++)
+    for (uint32_t n = 1; n <= DM2_INSTRUMENTS; n++)
         if (rd16(module, module->vars.inst_offsets + 2 * (n - 1)) == v->instrument - module->vars.inst_base)
             return (int)n;
     return -1;
@@ -619,4 +619,84 @@ Dm2Cell dm2_cell(const Dm2Module* module, int order, int voice, int row) {
     cell.effect = rd8(module, line + 2);
     cell.effect_arg = rd8(module, line + 3);
     return cell;
+}
+
+// The module as loaded, which the sounds are read from
+
+static uint8_t file_u8(const Dm2Module* m, uint32_t at) {
+    return at < m->file_size ? m->file[at] : 0;
+}
+
+static uint16_t file_u16(const Dm2Module* m, uint32_t at) {
+    return (uint16_t)((file_u8(m, at) << 8) | file_u8(m, at + 1));
+}
+
+// The bytes of the instrument records: the area ends where the waveforms' size word starts.
+static uint32_t instrument_area_size(const Dm2Module* m) {
+    return m->vars.waveforms - 4 - m->vars.inst_base;
+}
+
+// A note of a block row names the instrument; the offset table has no other sign of which entries are in use
+// (the unused ones are 0, like the first instrument's)
+static bool instrument_used(const Dm2Module* m, int instrument) {
+    for (uint32_t row = m->vars.blocks; row + 4 <= m->vars.inst_offsets && row + 4 <= m->file_size; row += 4)
+        if (file_u8(m, row) != 0 && file_u8(m, row + 1) == instrument)
+            return true;
+    return false;
+}
+
+// The wave number a synth instrument's sound table starts with, following a jump
+static bool first_table_wave(const Dm2Module* m, uint32_t inst, uint8_t* wave) {
+    const uint32_t table = inst + INST_SOUND_TABLE;
+    uint8_t position = 0;
+    *wave = file_u8(m, table);
+    if (*wave == 0xff) {
+        position = file_u8(m, table + 1);
+        *wave = file_u8(m, table + position);
+    }
+    return *wave != 0xff;
+}
+
+bool dm2_instrument_pcm(const Dm2Module* module, int instrument, const uint8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length) {
+    if (!module || instrument < 1 || instrument > DM2_INSTRUMENTS)
+        return false;
+    const uint32_t offset = file_u16(module, module->vars.inst_offsets + 2u * (uint32_t)(instrument - 1));
+    const uint32_t inst = offset + module->vars.inst_base;
+    // the offset table has 127 words; those past the last instrument point behind the instrument area
+    if (offset + INST_SIZE > instrument_area_size(module) || (offset == 0 && !instrument_used(module, instrument)))
+        return false;
+
+    uint32_t start;
+    uint32_t size = (uint32_t)file_u16(module, inst + INST_LENGTH) * 2;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (file_u8(module, inst + INST_SAMPLE_FLAG) & 0x80) {
+        start = sample_address(module, inst);
+        const uint32_t repeat_start = file_u16(module, inst + INST_REPEAT_START);
+        const uint32_t repeat_length = (uint32_t)file_u16(module, inst + INST_REPEAT_LENGTH) * 2;
+        if (repeat_length > 2) {
+            *loop_start = repeat_start;
+            *loop_length = repeat_length;
+            size = size > repeat_start + repeat_length ? size : repeat_start + repeat_length;
+        }
+    } else {
+        uint8_t wave;
+        if (!first_table_wave(module, inst, &wave) || wave == 0)
+            return false; // wave 0 starts with the generated noise
+        start = module->vars.waveforms + ((uint32_t)wave << 8);
+        *loop_length = size;
+    }
+    if (size == 0 || start >= module->file_size)
+        return false;
+    if (size > module->file_size - start) {
+        size = module->file_size - start;
+        if (*loop_start >= size || *loop_length > size - *loop_start) {
+            *loop_start = 0;
+            *loop_length = 0;
+        }
+    }
+    *data = module->file + start;
+    *length = size;
+    return true;
 }

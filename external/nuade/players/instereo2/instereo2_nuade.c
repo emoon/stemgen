@@ -135,6 +135,24 @@ static uint32_t instereo2_tracker_cells(void* user_data, const NuadePosition* at
                               user_data);
 }
 
+static uint32_t instereo2_sample_count(void* user_data) {
+    return (uint32_t)is2_sound_count((const Is2Module*)user_data);
+}
+
+static bool instereo2_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    Is2SoundPcm sound;
+    if (!is2_sound_pcm((const Is2Module*)user_data, (int)n, &sound)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = sound.instrument,
+                                 .data = sound.data,
+                                 .frames = sound.length,
+                                 .bits = 8,
+                                 .loop_start = sound.loop_start,
+                                 .loop_frames = sound.loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_instereo2 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "instereo2",
@@ -152,6 +170,8 @@ const NuadePlayer nuade_player_instereo2 = {
     .tracker_info = instereo2_tracker_info,
     .tracker_cells = instereo2_tracker_cells,
     .dump_state = instereo2_dump_state,
+    .sample_count = instereo2_sample_count,
+    .sample_get = instereo2_sample_get,
 };
 
 Is2Module* is2_from_nuade(NuadeSong* song) {

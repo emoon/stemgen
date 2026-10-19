@@ -452,6 +452,37 @@ uint32_t rjp_grid_ticks(void) {
     return START_SPEED;
 }
 
+uint32_t rjp_instrument_count(const RjpPlayer* player) {
+    const uint32_t count = player->module.instruments.size / RJP_INSTRUMENT_SIZE;
+    return count < RJP_MAX_INSTRUMENTS ? count : RJP_MAX_INSTRUMENTS;
+}
+
+bool rjp_instrument_pcm(const RjpPlayer* player, uint32_t n, RjpInstrumentPcm* out) {
+    if (n >= rjp_instrument_count(player)) {
+        return false;
+    }
+    const RjpInstrument in = rjp_read_instrument(&player->module, (uint8_t)n);
+    // the attack plays once, then the loop repeats (AUDxLEN 0 is 65536 words)
+    const uint64_t attack_words = in.attack_words != 0 ? in.attack_words : RJP_ZERO_LENGTH_WORDS;
+    const uint64_t loop_words = in.loop_words != 0 ? in.loop_words : RJP_ZERO_LENGTH_WORDS;
+    uint64_t lo = (uint64_t)in.sample + in.attack_offset;
+    uint64_t hi = lo + attack_words * 2;
+    const uint64_t loop_at = (uint64_t)in.sample + in.loop_offset_words * 2u;
+    const bool loops = in.loop_words > 1;
+    if (loops) {
+        lo = loop_at < lo ? loop_at : lo;
+        hi = loop_at + loop_words * 2 > hi ? loop_at + loop_words * 2 : hi;
+    }
+    if (hi > player->samples.size || hi - lo <= 2) { // a single word is the driver's silence
+        return false;
+    }
+    *out = (RjpInstrumentPcm) { .data = (const int8_t*)player->samples_original + lo,
+                                .frames = (uint32_t)(hi - lo),
+                                .loop_start = loops ? (uint32_t)(loop_at - lo) : 0,
+                                .loop_frames = loops ? (uint32_t)(loop_words * 2) : 0 };
+    return true;
+}
+
 RjpVoiceState rjp_voice_state(const RjpPlayer* player, uint32_t voice) {
     if (voice >= RJP_VOICES) {
         return (RjpVoiceState) { .note = -1, .instrument = -1 };

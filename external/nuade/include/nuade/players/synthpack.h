@@ -210,6 +210,12 @@ SpTickResult sp_tick(SpPlayer* player, NuadeVoices* voices);
 uint32_t sp_grid_ticks(const SpPlayer* player);
 SpVoiceState sp_voice_state(const SpPlayer* player, int voice);
 
+// The instruments of the sample set (what sp_voice_state numbers) and the waveform of one (8 bit): the stored waveform
+// with its loop. False for an entry that is not in the set.
+uint32_t sp_instrument_count(const SpPlayer* player);
+bool sp_instrument_pcm(const SpPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 SpPlayer* sp_from_nuade(NuadeSong* song);
 

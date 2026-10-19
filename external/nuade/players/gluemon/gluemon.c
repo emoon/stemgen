@@ -303,3 +303,25 @@ int gm_voice_instrument(const GmPlayer* player, uint32_t voice) {
     }
     return GM_VOICES + 2;
 }
+
+// The sounds are the instruments gm_voice_instrument numbers: the module's four waveforms and, when the fourth voice
+// plays percussion, the ramp, the noise and the pattern bytes.
+#define SOUND_RAMP GM_VOICES
+#define SOUND_NOISE (GM_VOICES + 1)
+#define SOUND_PATTERN (GM_VOICES + 2)
+
+uint32_t gm_sound_count(const GmPlayer* player) {
+    return player->module.percussion ? SOUND_PATTERN + 1 : GM_VOICES;
+}
+
+bool gm_sound_pcm(const GmPlayer* player, uint32_t n, const int8_t** data, uint32_t* bytes) {
+    if (n < GM_VOICES) {
+        *data = gm_wave(&player->module, n);
+    } else if (n == SOUND_RAMP && player->module.percussion) {
+        *data = k_ramp_wave;
+    } else {
+        return false; // the noise is made up again at every use, the pattern bytes differ with the pattern
+    }
+    *bytes = GM_WAVE_BYTES;
+    return true;
+}

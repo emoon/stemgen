@@ -230,6 +230,13 @@ bool avp_start(AvpModule* module, int subsong, NuadeVoices* voices);
 // song (it does not loop).
 bool avp_tick(AvpModule* module);
 
+// The instruments of the module (the voice state numbers them) and the PCM of one's sample, in bytes: the sample the
+// instrument names when a note starts it (effects may switch to another while it plays). False for an instrument whose
+// sample is empty.
+int avp_sample_count(const AvpModule* module);
+bool avp_sample_pcm(const AvpModule* module, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length);
+
 // Ticks one track step lasts at the song's start speed (0 if the song has none); a note lasts a whole number of steps.
 uint32_t avp_ticks_per_step(const AvpModule* module, int subsong);
 

@@ -73,6 +73,20 @@ static uint32_t medley_grid_ticks(void* user_data, uint32_t subsong) {
     return MDL_GRID_TICKS;
 }
 
+static uint32_t medley_sample_count(void* user_data) {
+    return (uint32_t)mdl_sample_count((MdlPlayer*)user_data);
+}
+
+static bool medley_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_length;
+    if (!mdl_sample_pcm((MdlPlayer*)user_data, (int)n, &data, &length, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n, .data = data, .frames = length, .bits = 8, .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_medley = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "medley",
@@ -87,6 +101,8 @@ const NuadePlayer nuade_player_medley = {
     .metadata = medley_metadata,
     .voice_info = medley_voice_info,
     .grid_ticks = medley_grid_ticks,
+    .sample_count = medley_sample_count,
+    .sample_get = medley_sample_get,
 };
 
 MdlPlayer* mdl_from_nuade(NuadeSong* song) {

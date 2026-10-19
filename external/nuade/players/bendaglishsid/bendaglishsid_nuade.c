@@ -77,6 +77,22 @@ static uint32_t bendaglishsid_grid_ticks(void* user_data, uint32_t subsong) {
     return BDS_GRID_TICKS;
 }
 
+static uint32_t bendaglishsid_sample_count(void* user_data) {
+    return (uint32_t)bds_sample_count((const BdsPlayer*)user_data);
+}
+
+static bool bendaglishsid_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!bds_sample_pcm((const BdsPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_bendaglishsid = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "bendaglishsid",
@@ -91,6 +107,8 @@ const NuadePlayer nuade_player_bendaglishsid = {
     .metadata = bendaglishsid_metadata,
     .voice_info = bendaglishsid_voice_info,
     .grid_ticks = bendaglishsid_grid_ticks,
+    .sample_count = bendaglishsid_sample_count,
+    .sample_get = bendaglishsid_sample_get,
 };
 
 BdsPlayer* bds_from_nuade(NuadeSong* song) {

@@ -150,6 +150,12 @@ uint32_t mxe_grid_ticks(const MxePlayer* player);
 
 MxeVoiceState mxe_voice_state(const MxePlayer* player, int voice);
 
+// The instrument table of the sample file. An instrument is 8-bit PCM and a loop inside it; false for one with no
+// sound. `loop_length` 0: the sound does not repeat (or repeats a part that lies outside the sound).
+int mxe_instrument_count(const MxePlayer* player);
+bool mxe_instrument_pcm(const MxePlayer* player, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 MxePlayer* mxe_from_nuade(NuadeSong* song);
 

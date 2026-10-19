@@ -14,7 +14,7 @@
 
 #define HEADER_SIZE 0x50
 #define POSITION_SIZE 14
-#define WAVEFORM_COUNT 42
+#define WAVEFORM_COUNT PUMA_WAVEFORM_COUNT
 #define WAVEFORM_SIZE 32
 #define WAVEFORM_WORDS 0x10
 #define SOURCE_COUNT (PUMA_SAMPLE_COUNT + WAVEFORM_COUNT)
@@ -235,6 +235,33 @@ void puma_destroy(PumaPlayer* player) {
     }
     free(player->mod.data);
     free(player);
+}
+
+bool puma_source_pcm(const PumaPlayer* player, uint32_t n, PumaSourcePcm* out) {
+    if (player == nullptr || n >= SOURCE_COUNT) {
+        return false;
+    }
+    const PumaModule* mod = &player->mod;
+    if (n >= PUMA_SAMPLE_COUNT) {
+        *out = (PumaSourcePcm) { .data = (const int8_t*)k_waveforms + (n - PUMA_SAMPLE_COUNT) * WAVEFORM_SIZE,
+                                 .frames = WAVEFORM_SIZE,
+                                 .loop_frames = WAVEFORM_SIZE };
+        return true;
+    }
+    const uint32_t offset = mod->sample_offset[n];
+    uint32_t frames = (uint32_t)mod->sample_length[n] * 2;
+    if (offset == 0 || offset >= mod->size || frames == 0) {
+        return false;
+    }
+    if (frames > mod->size - offset) {
+        frames = (uint32_t)(mod->size - offset);
+    }
+    // a short sample repeats as a whole; a long one plays once (select_source)
+    const bool plays_once = mod->sample_length[n] >= LONG_SAMPLE_WORDS;
+    *out = (PumaSourcePcm) { .data = (const int8_t*)mod->data + offset,
+                             .frames = frames,
+                             .loop_frames = plays_once ? 0 : frames };
+    return true;
 }
 
 const char* puma_title(const PumaPlayer* player) {

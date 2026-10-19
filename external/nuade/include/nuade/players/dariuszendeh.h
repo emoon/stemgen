@@ -125,6 +125,13 @@ DzTickResult dz_tick(DzPlayer* player, NuadeVoices* voices);
 
 DzVoiceState dz_voice_state(const DzPlayer* player, int voice);
 
+// The instruments the songs' patterns name: numbers 0 to dz_instrument_count() - 1 (the table has no length of its
+// own). dz_instrument_pcm is false for an entry whose sample is empty or starts outside the module; one that runs past
+// the module's end is cut there. The sample plays from its start to its end and repeats until the row's stop flag
+// switches the voice off.
+int dz_instrument_count(const DzPlayer* player);
+bool dz_instrument_pcm(const DzPlayer* player, int inst, const int8_t** data, uint32_t* length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DzPlayer* dz_from_nuade(NuadeSong* song);
 

@@ -1698,6 +1698,23 @@ int rk_get_instrument_count(const RkModule* module) {
     return module ? module->num_instruments : 0;
 }
 
+bool rk_instrument_pcm(const RkModule* module, int inst, RkInstrumentPcm* out) {
+    if (!module || inst < 0 || inst >= module->num_instruments)
+        return false;
+    const RkInstrument* in = &module->instruments[inst];
+    const RkSample* sample = &module->samples[in->sample_number];
+    const int8_t* data = module->sample_data[sample->sample_number];
+    const uint32_t frames = sample->length_in_words * 2U;
+    if (!data || frames == 0 || frames > (uint32_t)module->sample_data_lengths[sample->sample_number])
+        return false;
+    // the file's data: the phasing of a synthesis instrument rewrites the playback copy; it plays as a loop of the
+    // whole
+    *out = (RkInstrumentPcm) { .data = data,
+                               .frames = frames,
+                               .loop_frames = in->type == RK_INSTRUMENT_SYNTHESIS ? frames : 0 };
+    return true;
+}
+
 float rk_get_instrument_param(const RkModule* module, int inst, const char* param) {
     if (!module || inst < 0 || inst >= module->num_instruments || !param)
         return -1.0f;

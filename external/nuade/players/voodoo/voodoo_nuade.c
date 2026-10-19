@@ -71,6 +71,23 @@ static void voodoo_metadata(void* user_data, const NuadeMetadataSink* sink) {
     sink->set_tag(sink->ctx, NUADE_META_FORMAT, "Voodoo Supreme Synthesizer");
 }
 
+static uint32_t voodoo_sample_count(void* user_data) {
+    return (uint32_t)vs_get_instrument_count((const VsModule*)user_data);
+}
+
+static bool voodoo_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length;
+    bool loops;
+    if (!vs_sample_pcm((const VsModule*)user_data, (int)n, &data, &length, &loops)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = 0, .loop_frames = loops ? length : 0
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_voodoo = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "voodoo",
@@ -85,6 +102,8 @@ const NuadePlayer nuade_player_voodoo = {
     .metadata = voodoo_metadata,
     .voice_info = voodoo_voice_info,
     .grid_ticks = voodoo_grid_ticks,
+    .sample_count = voodoo_sample_count,
+    .sample_get = voodoo_sample_get,
 };
 
 VsModule* vs_from_nuade(NuadeSong* song) {

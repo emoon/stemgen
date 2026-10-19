@@ -147,6 +147,23 @@ static uint32_t synthesis_tracker_cells(void* user_data, const NuadePosition* at
                               user_data);
 }
 
+static uint32_t synthesis_sample_count(void* user_data) {
+    return (uint32_t)syn_get_instrument_count((const SynModule*)user_data);
+}
+
+static bool synthesis_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SynModule* player = (const SynModule*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!syn_instrument_pcm(player, (int)n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_synthesis = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "synthesis",
@@ -163,6 +180,8 @@ const NuadePlayer nuade_player_synthesis = {
     .voice_info = synthesis_voice_info,
     .tracker_info = synthesis_tracker_info,
     .tracker_cells = synthesis_tracker_cells,
+    .sample_count = synthesis_sample_count,
+    .sample_get = synthesis_sample_get,
 };
 
 SynModule* syn_from_nuade(NuadeSong* song) {

@@ -18,6 +18,7 @@ extern "C" {
 
 #define TMY_VOICES 4
 #define TMY_ROWS 64
+#define TMY_INSTRUMENTS 31
 
 // The CIA clock: the timebase of TMY_TICK_LENGTH.
 #define TMY_TIMEBASE_HZ 709379
@@ -129,6 +130,11 @@ TmyVoiceState tmy_voice_state(const TmyPlayer* player, int voice);
 
 // `order` 0 .. tmy_order_count - 1, `voice` 0..3, `row` 0 .. TMY_ROWS - 1.
 TmyCell tmy_pattern_cell(const TmyPlayer* player, int order, int voice, int row);
+
+// The PCM of instrument `index` (0-based, as NuadeVoiceInfo.instrument) as the replayer hands it to Paula. Lengths and
+// loop in bytes. False for an empty instrument.
+bool tmy_instrument_pcm(const TmyPlayer* player, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                        uint32_t* loop_length);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 TmyPlayer* tmy_from_nuade(NuadeSong* song);

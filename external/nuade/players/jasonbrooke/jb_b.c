@@ -12,7 +12,6 @@
 typedef JbBVoice Voice;
 
 #define BLOCK_WORDS 0x40
-#define BLOCK_SHIFT 7
 
 // Bits of Voice.flags
 enum {
@@ -278,7 +277,7 @@ JbTickResult jb_b_tick(JbB* b, JbModule* m, NuadeVoices* voices) {
             Voice* v = &b->voices[i];
             v->paula.period = v->period;
             v->paula.volume = v->volume;
-            v->paula.lc = jbm_sample(m, t->blocks + ((uint32_t)v->block << BLOCK_SHIFT));
+            v->paula.lc = jbm_sample(m, t->blocks + ((uint32_t)v->block << JB_B_BLOCK_SHIFT));
         }
     }
     for (int i = 0; i < JB_VOICES; i++) {

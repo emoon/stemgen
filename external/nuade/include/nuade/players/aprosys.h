@@ -127,6 +127,15 @@ bool aps_start(ApsPlayer* player, int subsong, NuadeVoices* voices);
 
 // Run one player tick and hand the Paula registers it wrote to the voices.
 ApsTickResult aps_tick(ApsPlayer* player, NuadeVoices* voices);
+
+// The instruments of the module (the voice state numbers them), and the PCM of the sound an instrument names, in
+// bytes: its sample record, or the run of records a chained sound is made of when its parts follow each other in the
+// data. False for an instrument whose record makes no PCM of its own: a synthesised wave, a moving window or a chain
+// whose parts are apart.
+int aps_sample_count(const ApsPlayer* player);
+bool aps_sample_pcm(const ApsPlayer* player, int record, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length);
+
 ApsVoiceState aps_voice_state(const ApsPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

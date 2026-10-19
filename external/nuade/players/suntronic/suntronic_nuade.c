@@ -61,6 +61,23 @@ static uint32_t suntronic_voice_info(void* user_data, NuadeVoiceInfo* out, uint3
     return n;
 }
 
+static uint32_t suntronic_sample_count(void* user_data) {
+    return sun_instrument_count((const SunPlayer*)user_data);
+}
+
+static bool suntronic_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SunPlayer* player = (const SunPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!sun_instrument_pcm(player, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_suntronic = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "suntronic",
@@ -74,6 +91,8 @@ const NuadePlayer nuade_player_suntronic = {
     .tick = suntronic_tick,
     .metadata = suntronic_metadata,
     .voice_info = suntronic_voice_info,
+    .sample_count = suntronic_sample_count,
+    .sample_get = suntronic_sample_get,
 };
 
 SunPlayer* sun_from_nuade(NuadeSong* song) {

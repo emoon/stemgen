@@ -2168,6 +2168,54 @@ const char* sa_get_instrument_name(const SaModule* module, int inst) {
     return module->instruments[inst].name;
 }
 
+bool sa_instrument_pcm(const SaModule* module, int inst, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length) {
+    if (!module || inst < 0 || inst >= module->num_instruments)
+        return false;
+    const SaInstrument* in = &module->instruments[inst];
+    *loop_start = 0;
+    *loop_length = 0;
+    if (in->type != SA_INSTRUMENT_SAMPLE) {
+        if (in->waveform_number >= (uint16_t)module->num_waveforms
+            || module->waveform_data[in->waveform_number] == nullptr)
+            return false;
+        uint32_t size = in->waveform_length * 2U;
+        if (size > SA_WAVEFORM_SIZE)
+            size = SA_WAVEFORM_SIZE;
+        if (size == 0)
+            return false;
+        *data = module->waveform_data[in->waveform_number];
+        *length = size;
+        *loop_length = size;
+        return true;
+    }
+    // the same ranges play_sample_instrument hands to the channel
+    if (in->waveform_number >= (uint16_t)module->num_samples || module->sample_data[in->waveform_number] == nullptr)
+        return false;
+    uint32_t play_length = in->waveform_length;
+    uint32_t start = 0;
+    uint32_t loop = 0;
+    if (in->repeat_length == 0) {
+        loop = in->waveform_length;
+    } else if (in->repeat_length != 1) {
+        play_length += in->repeat_length;
+        start = in->waveform_length * 2U;
+        loop = in->repeat_length * 2U;
+    }
+    play_length *= 2;
+    if (play_length > module->sample_lengths[in->waveform_number])
+        play_length = module->sample_lengths[in->waveform_number];
+    if (play_length == 0)
+        return false;
+    if (start + loop > play_length)
+        loop = play_length > start ? play_length - start : 0;
+    *data = module->sample_data[in->waveform_number];
+    *length = play_length;
+    *loop_start = start;
+    *loop_length = loop;
+    return true;
+}
+
 float sa_get_instrument_param(const SaModule* module, int inst, const char* param) {
     if (!module || inst < 0 || inst >= module->num_instruments || !param)
         return -1.0f;

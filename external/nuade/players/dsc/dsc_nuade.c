@@ -62,6 +62,26 @@ static uint32_t dsc_nuade_grid_ticks(void* user_data, uint32_t subsong) {
     return (uint32_t)dsc_tempo((const DscPlayer*)user_data);
 }
 
+static uint32_t dsc_nuade_sample_count(void* user_data) {
+    return (uint32_t)dsc_sound_count((const DscPlayer*)user_data);
+}
+
+static bool dsc_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length, rate;
+    if (!dsc_sound_pcm((const DscPlayer*)user_data, (int)n, &data, &length, &loop_start, &loop_length, &rate)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .rate = rate,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_dsc = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "dsc",
@@ -76,6 +96,8 @@ const NuadePlayer nuade_player_dsc = {
     .metadata = dsc_nuade_metadata,
     .voice_info = dsc_nuade_voice_info,
     .grid_ticks = dsc_nuade_grid_ticks,
+    .sample_count = dsc_nuade_sample_count,
+    .sample_get = dsc_nuade_sample_get,
 };
 
 DscPlayer* dsc_from_nuade(NuadeSong* song) {

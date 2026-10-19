@@ -556,6 +556,158 @@ SplTickResult spl_tick(SplPlayer* p, NuadeVoices* voices) {
     return (SplTickResult) { .looped = p->looped };
 }
 
+// Sounds
+
+int32_t spl_record_sound_id(const SplBuild* build, const SplRecord* record) {
+    if (build->family == SplFamily_Table) {
+        return (int32_t)record->sample_number;
+    }
+    const uint32_t offset = record->sample >= build->load_base ? record->sample - build->load_base : record->sample;
+    return (int32_t)(offset >> 1);
+}
+
+#define MAX_SOUNDS 1024
+#define MAX_WALK_DEPTH 64
+
+typedef struct SoundWalk {
+    SplPlayer* player;
+    uint8_t* seen; // a byte for each byte of the hunk: a command starts there
+    bool full;     // the sound list is full
+} SoundWalk;
+
+// The sample a record names, as bytes of the hunk. False when it does not lie in the hunk.
+static bool record_sound(const SplPlayer* p, const SplRecord* r, SplSound* sound) {
+    const SplModule* module = p->module;
+    const SplBuild* build = module->build;
+    uint32_t address;
+    uint32_t bytes;
+    *sound = (SplSound) { .id = spl_record_sound_id(build, r) };
+    if (build->family == SplFamily_Table) {
+        address = read_u32(p, spl_module_address(module, build->address_table) + (uint16_t)(r->sample_number << 2));
+        bytes = read_u16(p, spl_module_address(module, build->size_table) + (uint16_t)(r->sample_number << 1));
+    } else {
+        address = r->sample + (build->family == SplFamily_Full ? spl_module_address(module, build->sample_base) : 0);
+        bytes = (uint32_t)r->length * 2;
+    }
+    address &= ~1u;
+    if (address < build->load_base || address - build->load_base >= module->size) {
+        return false;
+    }
+    sound->offset = address - build->load_base;
+    sound->frames = bytes & ~1u;
+    if (sound->frames > module->size - sound->offset) {
+        sound->frames = module->size - sound->offset;
+    }
+    if (sound->frames == 0) {
+        return false;
+    }
+    if (build->family != SplFamily_Table) {
+        sound->loop_frames = sound->frames; // the registers are left alone: Paula repeats the whole sample
+    } else if ((r->loop_start >> 1) != 0 && 2u * (r->loop_start >> 1) < sound->frames) {
+        sound->loop_start = 2u * (r->loop_start >> 1);
+        sound->loop_frames = sound->frames - sound->loop_start;
+    }
+    return true;
+}
+
+static void add_sound(SoundWalk* walk, const SplRecord* record) {
+    SplPlayer* p = walk->player;
+    SplSound sound;
+    if (!record_sound(p, record, &sound)) {
+        return;
+    }
+    for (uint32_t i = 0; i < p->sound_count; i++) {
+        if (p->sounds[i].id == sound.id) {
+            return;
+        }
+    }
+    if (p->sound_count == MAX_SOUNDS) {
+        walk->full = true;
+        return;
+    }
+    SplSound* grown = (SplSound*)realloc(p->sounds, (p->sound_count + 1) * sizeof(SplSound));
+    if (grown == nullptr) {
+        walk->full = true;
+        return;
+    }
+    p->sounds = grown;
+    p->sounds[p->sound_count++] = sound;
+}
+
+// Follows a command stream the way step_voice reads it, without running anything, and collects the records it copies.
+// A call is followed and then continued behind; a jump goes on at its target; a stream stops at a command it has read
+// before, at a return, at the stop command or outside the hunk.
+static void walk_stream(SoundWalk* walk, uint32_t at, uint16_t flags, uint32_t depth) {
+    const SplPlayer* p = walk->player;
+    const SplBuild* build = p->module->build;
+    const uint32_t base = build->load_base;
+    while (!walk->full && at >= base && at - base < p->module->size) {
+        if (walk->seen[at - base] != 0) {
+            return;
+        }
+        walk->seen[at - base] = 1;
+        const uint8_t byte = read_u8(p, at);
+        if (byte == CMD_SKIP || (build->skip_fe && byte == CMD_SKIP_FE)) {
+            at++;
+        } else if (byte == CMD_JUMP) {
+            at = read_u32(p, at + 1);
+        } else if (byte == CMD_CALL) {
+            if (depth < MAX_WALK_DEPTH) {
+                walk_stream(walk, read_u32(p, at + 1), flags, depth + 1);
+            }
+            at += 5;
+        } else if (byte == CMD_RETURN || (build->stop_f5 && byte == CMD_STOP)) {
+            return;
+        } else if (byte == CMD_COPY_RECORD) {
+            SplRecord record = { 0 };
+            load_record(p, &record, at + 1);
+            add_sound(walk, &record);
+            flags = record.flags;
+            at += 1 + record_bytes(build->family);
+        } else if (build->stop_f5 && byte == CMD_TRANSPOSE) {
+            at += 2;
+        } else if ((byte & CMD_CLASS_MASK) >= CMD_LENGTH_FIRST && (byte & CMD_CLASS_MASK) <= CMD_LENGTH_LAST) {
+            at++;
+        } else {
+            at += 1 + extra_notes(build, flags);
+        }
+    }
+}
+
+static void collect_sounds(SplPlayer* p) {
+    const SplBuild* build = p->module->build;
+    SoundWalk walk = { .player = p, .seen = (uint8_t*)calloc(p->module->size, 1) };
+    if (walk.seen == nullptr) {
+        return;
+    }
+    for (uint32_t s = 0; s < build->song_count; s++) {
+        const SplSong* song = &build->songs[s];
+        const uint32_t voices = song->voices != 0 ? song->voices : SPL_VOICES;
+        for (uint32_t v = 0; v < voices; v++) {
+            walk_stream(&walk, spl_module_address(p->module, song->streams[v]), 0, 0);
+        }
+    }
+    free(walk.seen);
+}
+
+uint32_t spl_sound_count(const SplPlayer* player) {
+    return player->sound_count;
+}
+
+bool spl_sound_pcm(const SplPlayer* player, uint32_t n, int32_t* id, const int8_t** data, uint32_t* frames,
+                   uint32_t* loop_start, uint32_t* loop_frames) {
+    if (n >= player->sound_count) {
+        return false;
+    }
+    const SplSound* sound = &player->sounds[n];
+    *id = sound->id;
+    *data = (const int8_t*)player->module->original + sound->offset;
+    *frames = sound->frames;
+    *loop_start = sound->loop_start;
+    *loop_frames = sound->loop_frames;
+    return true;
+}
+
 // Opening
 
 SplPlayer* spl_create(const uint8_t* data, size_t size) {
@@ -569,6 +721,7 @@ SplPlayer* spl_create(const uint8_t* data, size_t size) {
         return nullptr;
     }
     player->module = module;
+    collect_sounds(player);
     return player;
 }
 
@@ -582,6 +735,7 @@ bool spl_probe(const uint8_t* data, size_t size) {
 void spl_destroy(SplPlayer* player) {
     if (player != nullptr) {
         spl_module_close(player->module);
+        free(player->sounds);
     }
     free(player);
 }

@@ -29,7 +29,9 @@
 #define PSA_SUBSONG_BYTES 8
 #define PSA_INSTRUMENT_SHIFT 6 // an instrument is 64 bytes
 #define PSA_INSTRUMENT_READ_BYTES 0x22
-#define PSA_PATTERN_SHIFT 10 // a pattern is 64 rows of 4 voices x 4 bytes
+#define PSA_INSTRUMENT_NAME 0x20 // the name field of an instrument, up to its end
+#define PSA_INSTRUMENT_MAX 256   // the instrument of a note is a byte
+#define PSA_PATTERN_SHIFT 10     // a pattern is 64 rows of 4 voices x 4 bytes
 #define PSA_NOTE_BYTES 4u
 #define PSA_DEFAULT_SPEED 6
 #define PSA_ROW_LAST 0x3F
@@ -763,6 +765,43 @@ static bool parse_layout(PsaPlayer* player) {
     return !player->fault;
 }
 
+// The instruments are 64 bytes from the instrument table to the pattern number table (the last one may be cut short by
+// two bytes). Their names are copied, printable characters only, without the trailing spaces.
+static bool read_instrument_names(PsaPlayer* player) {
+    const uint32_t table = player->layout.instruments;
+    const uint32_t end = player->layout.orders;
+    uint32_t count = 0;
+    if (end > table && end <= player->size) {
+        count = (end - table + (1u << PSA_INSTRUMENT_SHIFT) - 1) >> PSA_INSTRUMENT_SHIFT;
+    }
+    if (count > PSA_INSTRUMENT_MAX) {
+        count = PSA_INSTRUMENT_MAX;
+    }
+    player->instrument_count = count;
+    if (count == 0) {
+        return true;
+    }
+    player->instrument_names = (char(*)[PSA_NAME_BYTES + 1]) calloc(count, PSA_NAME_BYTES + 1);
+    if (player->instrument_names == nullptr) {
+        return false;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        const uint64_t at = (uint64_t)table + ((uint64_t)i << PSA_INSTRUMENT_SHIFT) + PSA_INSTRUMENT_NAME;
+        size_t len = 0;
+        for (uint32_t k = 0; k < PSA_NAME_BYTES && at + k < player->size; k++) {
+            const uint8_t c = module_bytes(player)[at + k];
+            if (c >= 0x20 && c < 0x7F) {
+                player->instrument_names[i][len++] = (char)c;
+            }
+        }
+        while (len > 0 && player->instrument_names[i][len - 1] == ' ') {
+            len--;
+        }
+        player->instrument_names[i][len] = '\0';
+    }
+    return true;
+}
+
 PsaPlayer* psa_create(const uint8_t* data, size_t size) {
     if (data == nullptr || size < PSA_SUBSONG_TABLE + PSA_SUBSONG_BYTES || size > 0x7FFFFFFF) {
         return nullptr;
@@ -794,6 +833,10 @@ PsaPlayer* psa_create(const uint8_t* data, size_t size) {
     for (size_t n = PSA_TITLE_BYTES; n > 0 && player->title[n - 1] == ' '; n--) {
         player->title[n - 1] = '\0';
     }
+    if (!read_instrument_names(player)) {
+        psa_destroy(player);
+        return nullptr;
+    }
     uint32_t budget = PSA_DRY_RUN_TICKS;
     for (uint32_t i = 0; i < player->layout.subsong_count; i++) {
         // psa_start resets all state: a subsong with the entry of an earlier one plays the same
@@ -814,6 +857,7 @@ PsaPlayer* psa_create(const uint8_t* data, size_t size) {
 
 void psa_destroy(PsaPlayer* player) {
     if (player != nullptr) {
+        free(player->instrument_names);
         free(player->chip);
         free(player);
     }
@@ -832,6 +876,37 @@ uint32_t psa_subsong_count(const PsaPlayer* player) {
 
 const char* psa_title(const PsaPlayer* player) {
     return player->title;
+}
+
+uint32_t psa_instrument_count(const PsaPlayer* player) {
+    return player->instrument_count;
+}
+
+bool psa_instrument_pcm(const PsaPlayer* player, uint32_t n, PsaInstrumentPcm* out) {
+    if (n >= player->instrument_count) {
+        return false;
+    }
+    PsaPlayer reader = *player; // read_instrument counts reads outside the module as faults, which stay local here
+    const PsaInstrument ins
+        = read_instrument(&reader, (int64_t)player->layout.instruments + ((int64_t)n << PSA_INSTRUMENT_SHIFT));
+    if (reader.fault != player->fault || ins.pwm.enabled || ins.length_words == 0) {
+        return false; // outside the module, or a pulse-width synth: its wave is built at run time
+    }
+    const uint64_t bytes = (uint64_t)ins.length_words * 2;
+    if (ins.sample >= player->size || bytes > player->size - ins.sample) {
+        return false;
+    }
+    *out = (PsaInstrumentPcm) { .data = (const int8_t*)module_bytes(player) + ins.sample,
+                                .frames = (uint32_t)bytes,
+                                .name = player->instrument_names[n] };
+    // the repeat starts at the absolute offset loop_start; 0 leaves the sample playing once
+    if (ins.loop_start != 0 && ins.loop_words > 1 && ins.loop_start >= ins.sample
+        && ins.loop_start - ins.sample < bytes) {
+        out->loop_start = ins.loop_start - ins.sample;
+        const uint64_t loop_bytes = (uint64_t)ins.loop_words * 2;
+        out->loop_frames = (uint32_t)(loop_bytes < bytes - out->loop_start ? loop_bytes : bytes - out->loop_start);
+    }
+    return true;
 }
 
 uint32_t psa_grid_ticks(const PsaPlayer* player) {

@@ -69,6 +69,24 @@ static uint32_t seanconnolly_grid_ticks(void* user_data, uint32_t subsong) {
     return SCO_GRID_TICKS;
 }
 
+static uint32_t seanconnolly_sample_count(void* user_data) {
+    return sco_instrument_count((const ScoPlayer*)user_data);
+}
+
+static bool seanconnolly_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    ScoPcm pcm;
+    if (!sco_instrument_pcm((const ScoPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = pcm.data,
+                                 .frames = pcm.length,
+                                 .bits = 8,
+                                 .loop_start = pcm.loop_start,
+                                 .loop_frames = pcm.loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_seanconnolly = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "seanconnolly",
@@ -83,6 +101,8 @@ const NuadePlayer nuade_player_seanconnolly = {
     .metadata = seanconnolly_metadata,
     .voice_info = seanconnolly_voice_info,
     .grid_ticks = seanconnolly_grid_ticks,
+    .sample_count = seanconnolly_sample_count,
+    .sample_get = seanconnolly_sample_get,
 };
 
 ScoPlayer* sco_from_nuade(NuadeSong* song) {

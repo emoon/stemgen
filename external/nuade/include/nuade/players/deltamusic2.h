@@ -147,6 +147,14 @@ Dm2VoiceState dm2_voice_state(const Dm2Module* module, int voice);
 // The row `row` of the block at position `order` of the track list of `voice`; empty outside the track list.
 Dm2Cell dm2_cell(const Dm2Module* module, int order, int voice, int row);
 
+// The sound of instrument number 1..DM2_INSTRUMENTS, from the module as loaded (the player rewrites the noise wave and
+// the first word of a sample while it plays). A sample instrument is its sample; a synth instrument is the wave its
+// sound table starts with, which Paula repeats. False for a number the module does not define, and for the noise
+// wave, which the player generates.
+#define DM2_INSTRUMENTS 127
+bool dm2_instrument_pcm(const Dm2Module* module, int instrument, const uint8_t** data, uint32_t* length,
+                        uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 Dm2Module* dm2_from_nuade(NuadeSong* song);
 

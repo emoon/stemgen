@@ -270,6 +270,48 @@ IgTickResult ig_tick(IgPlayer* player, NuadeVoices* voices) {
     return (IgTickResult) { .ended = ended };
 }
 
+// The sample table has no count of its own: it ends where the first sample starts.
+uint32_t ig_sample_count(const IgPlayer* player) {
+    const IgFile* file = &player->samples;
+    uint64_t limit
+        = file->size > IG_SAMPLE_HEADER_SIZE ? (file->size - IG_SAMPLE_HEADER_SIZE) / IG_SAMPLE_ENTRY_SIZE : 0;
+    uint64_t n = 0;
+    IgSample sample;
+    for (; n < limit && ig_read_sample(file, (unsigned)n, &sample); n++) {
+        const uint64_t table_end = (n + 1) * IG_SAMPLE_ENTRY_SIZE;
+        if (sample.length_words != 0 && sample.start >= table_end && sample.start / IG_SAMPLE_ENTRY_SIZE < limit) {
+            limit = sample.start / IG_SAMPLE_ENTRY_SIZE;
+        }
+    }
+    return (uint32_t)n;
+}
+
+bool ig_sample_pcm(const IgPlayer* player, uint32_t n, const int8_t** data, uint32_t* frames, uint32_t* loop_start,
+                   uint32_t* loop_frames) {
+    const IgFile* file = &player->samples;
+    IgSample sample;
+    if (!ig_read_sample(file, n, &sample) || sample.length_words == 0) {
+        return false;
+    }
+    const uint64_t length = (uint64_t)sample.length_words * 2;
+    const uint64_t start = (uint64_t)IG_SAMPLE_HEADER_SIZE + (sample.start & ~(uint32_t)1);
+    if (start + length > file->size) {
+        return false;
+    }
+    *data = (const int8_t*)(file->data + start);
+    *frames = (uint32_t)length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The repeat is a run of its own; it is a loop of the sample where it lies inside it.
+    const uint64_t repeat = (uint64_t)IG_SAMPLE_HEADER_SIZE + (sample.repeat_start & ~(uint32_t)1);
+    const uint64_t repeat_length = (uint64_t)sample.repeat_length_words * 2;
+    if (sample.repeat_length_words > 1 && repeat >= start && repeat + repeat_length <= start + length) {
+        *loop_start = (uint32_t)(repeat - start);
+        *loop_frames = (uint32_t)repeat_length;
+    }
+    return true;
+}
+
 IgVoiceState ig_voice_state(const IgPlayer* player, int voice) {
     if (voice < 0 || voice >= IG_VOICES) {
         return (IgVoiceState) { .note = -1, .instrument = -1 };

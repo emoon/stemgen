@@ -57,6 +57,22 @@ static uint32_t maniacsofnoise_voice_info(void* user_data, NuadeVoiceInfo* out, 
     return count;
 }
 
+static uint32_t maniacsofnoise_sample_count(void* user_data) {
+    return ((const MonPlayer*)user_data)->module.instrument_count;
+}
+
+static bool maniacsofnoise_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!mon_instrument_pcm((const MonPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_maniacsofnoise = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "maniacsofnoise",
@@ -70,6 +86,8 @@ const NuadePlayer nuade_player_maniacsofnoise = {
     .tick = maniacsofnoise_tick,
     .metadata = maniacsofnoise_metadata,
     .voice_info = maniacsofnoise_voice_info,
+    .sample_count = maniacsofnoise_sample_count,
+    .sample_get = maniacsofnoise_sample_get,
 };
 
 MonPlayer* mon_from_nuade(NuadeSong* song) {

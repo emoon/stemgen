@@ -2062,6 +2062,37 @@ bool bd_tick(BdModule* module) {
     return looped;
 }
 
+uint32_t bd_sample_count(const BdModule* module) {
+    return module != nullptr ? (uint32_t)module->sample_count : 0;
+}
+
+bool bd_sample_pcm(const BdModule* module, uint32_t sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    if (module == nullptr || sample >= module->sample_count) {
+        return false;
+    }
+    const BdSample* s = &module->samples[sample];
+    if (s->sample_data == nullptr) {
+        return false;
+    }
+    // the loader keeps the first part and the loop, and drops a loop that is not inside the data
+    const uint32_t first = s->length * 2u;
+    const uint32_t loop_end = s->loop_offset + s->loop_length * 2u;
+    const uint32_t end = first > loop_end ? first : loop_end;
+    if (end == 0) {
+        return false;
+    }
+    *data = s->sample_data;
+    *length = end;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (s->loop_length > 1) {
+        *loop_start = s->loop_offset;
+        *loop_length = s->loop_length * 2u;
+    }
+    return true;
+}
+
 bool bd_voice_started(const BdModule* module, uint32_t voice, int32_t* note, int32_t* instrument) {
     if (module == nullptr || note == nullptr || instrument == nullptr || voice >= BD_VOICE_COUNT
         || module->player->playback[voice].started_note < 0) {

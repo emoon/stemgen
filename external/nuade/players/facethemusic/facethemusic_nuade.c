@@ -140,6 +140,28 @@ static uint32_t facethemusic_tracker_cells(void* user_data, const NuadePosition*
                               channel, row_lo, row_hi, out, cap, facethemusic_cell, module);
 }
 
+static uint32_t facethemusic_sample_count(void* user_data) {
+    return (uint32_t)ftm_get_instrument_count((const FtmModule*)user_data);
+}
+
+static bool facethemusic_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const FtmModule* module = (const FtmModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!ftm_sample_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = ftm_get_instrument_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_facethemusic = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "facethemusic",
@@ -156,6 +178,8 @@ const NuadePlayer nuade_player_facethemusic = {
     .voice_info = facethemusic_voice_info,
     .tracker_info = facethemusic_tracker_info,
     .tracker_cells = facethemusic_tracker_cells,
+    .sample_count = facethemusic_sample_count,
+    .sample_get = facethemusic_sample_get,
 };
 
 FtmModule* ftm_from_nuade(NuadeSong* song) {

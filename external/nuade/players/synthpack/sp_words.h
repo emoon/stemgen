@@ -24,6 +24,11 @@ extern const SpRules sp_word_rules;
 void sp_word_start(SpWordState* state, const SpMemory* song, const SpMemory* set, SpHardware* hardware, int subsong);
 void sp_word_tick(SpWordState* state, SpHardware* hardware);
 
+// The instruments the sample set's table lists (at most SP_INSTRUMENTS), and the waveform of one; false for an entry
+// outside the set.
+unsigned sp_word_instrument_total(const SpMemory* set);
+bool sp_word_instrument_wave(const SpMemory* set, unsigned index, SpWave* wave);
+
 // Every voice has died away.
 bool sp_word_silent(const SpWordState* state);
 

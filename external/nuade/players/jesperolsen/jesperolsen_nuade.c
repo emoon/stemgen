@@ -70,6 +70,24 @@ static uint32_t jesperolsen_grid_ticks(void* user_data, uint32_t subsong) {
     return GRID_TICKS;
 }
 
+static uint32_t jesperolsen_sample_count(void* user_data) {
+    return jo_instrument_count((const JoPlayer*)user_data);
+}
+
+static bool jesperolsen_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    JoSound sound;
+    if (!jo_instrument_sound((const JoPlayer*)user_data, n, &sound)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .data = sound.data,
+                                 .frames = sound.length,
+                                 .bits = 8,
+                                 .loop_start = sound.loop_start,
+                                 .loop_frames = sound.loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_jesperolsen = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "jesperolsen",
@@ -84,6 +102,8 @@ const NuadePlayer nuade_player_jesperolsen = {
     .metadata = jesperolsen_metadata,
     .voice_info = jesperolsen_voice_info,
     .grid_ticks = jesperolsen_grid_ticks,
+    .sample_count = jesperolsen_sample_count,
+    .sample_get = jesperolsen_sample_get,
 };
 
 JoPlayer* jo_from_nuade(NuadeSong* song) {

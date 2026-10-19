@@ -131,6 +131,28 @@ static uint32_t laxity_tracker_cells(void* user_data, const NuadePosition* at, u
                               laxity_cell, user_data);
 }
 
+static uint32_t laxity_sample_count(void* user_data) {
+    return (uint32_t)lx_instrument_count((const LxPlayer*)user_data);
+}
+
+// Instrument n of the nuade API is the cell's instrument n + 1.
+static bool laxity_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const LxPlayer* player = (const LxPlayer*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!lx_instrument_pcm(player, (int)n + 1, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = lx_instrument_name(player, (int)n + 1),
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_laxity = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "laxity",
@@ -147,6 +169,8 @@ const NuadePlayer nuade_player_laxity = {
     .voice_info = laxity_voice_info,
     .tracker_info = laxity_tracker_info,
     .tracker_cells = laxity_tracker_cells,
+    .sample_count = laxity_sample_count,
+    .sample_get = laxity_sample_get,
 };
 
 LxPlayer* lx_from_nuade(NuadeSong* song) {

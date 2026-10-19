@@ -133,6 +133,13 @@ PrTickResult pr_tick(PrPlayer* player, NuadeVoices* voices);
 uint32_t pr_voice_count(const PrPlayer* player);
 PrVoiceState pr_voice_state(const PrPlayer* player, uint32_t voice);
 
+// The instruments of the song (the numbers PrVoiceState.instrument has) and the sample of one as it lies in the sample
+// file: 8-bit data inside the player's copy, the length and the repeat in bytes (length 0: no loop). False for an
+// instrument without data.
+uint32_t pr_instrument_count(const PrPlayer* player);
+bool pr_instrument_pcm(const PrPlayer* player, uint32_t number, const int8_t** data, uint32_t* length,
+                       uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 PrPlayer* pr_from_nuade(NuadeSong* song);
 

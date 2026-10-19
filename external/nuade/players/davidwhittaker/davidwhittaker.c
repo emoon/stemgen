@@ -2055,3 +2055,27 @@ bool dw_voice_started(const DwModule* module, int voice, int* note, int* instrum
     *instrument = ch->started_instrument;
     return true;
 }
+
+int dw_sample_count(const DwModule* module) {
+    return module ? module->number_of_samples : 0;
+}
+
+bool dw_sample_pcm(const DwModule* module, int sample, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    if (!module || sample < 0 || sample >= module->number_of_samples)
+        return false;
+    if (module->enable_square_waveform && sample == module->square_waveform_sample_number)
+        return false;
+    const DwSample* s = &module->samples[sample];
+    if (s->sample_data == nullptr || s->length == 0)
+        return false;
+    *data = s->sample_data;
+    *length = s->length;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (s->loop_start >= 0 && (uint32_t)s->loop_start < s->length) {
+        *loop_start = (uint32_t)s->loop_start;
+        *loop_length = s->length - (uint32_t)s->loop_start;
+    }
+    return true;
+}

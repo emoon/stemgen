@@ -404,3 +404,20 @@ EmsCell ems_pattern_cell(const EmsPlayer* player, int order, int voice, int row)
     const EmsModule* m = &player->module;
     return read_cell(m, pattern_offset(m, order), (uint16_t)row, voice);
 }
+
+bool ems_instrument_pcm(const EmsPlayer* player, int inst, const int8_t** data, uint32_t* bytes, uint32_t* loop_start,
+                        uint32_t* loop_bytes) {
+    if (player == nullptr || inst < 0 || inst >= EMS_INSTRUMENTS) {
+        return false;
+    }
+    const EmsInstrument* ins = &player->module.instruments[inst];
+    if (ins->sample == nullptr || ins->length == 0) {
+        return false;
+    }
+    *data = ins->sample;
+    *bytes = (uint32_t)ins->length * 2;
+    // a loop of one word is the "no loop" the replayer writes
+    *loop_start = ins->loop_length > 1 ? (uint32_t)ins->loop_start * 2 : 0;
+    *loop_bytes = ins->loop_length > 1 ? (uint32_t)ins->loop_length * 2 : 0;
+    return true;
+}

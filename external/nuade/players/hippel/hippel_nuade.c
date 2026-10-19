@@ -101,6 +101,22 @@ static uint32_t hippel_grid_ticks(void* user_data, uint32_t subsong) {
     return (uint32_t)hip_speed((const HipPlayer*)user_data);
 }
 
+static uint32_t hippel_sample_count(void* user_data) {
+    return hip_sample_count((const HipPlayer*)user_data);
+}
+
+static bool hippel_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!hip_sample_pcm((const HipPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_hippel = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "hippel",
@@ -115,6 +131,8 @@ const NuadePlayer nuade_player_hippel = {
     .metadata = hippel_metadata,
     .voice_info = hippel_voice_info,
     .grid_ticks = hippel_grid_ticks,
+    .sample_count = hippel_sample_count,
+    .sample_get = hippel_sample_get,
 };
 
 HipPlayer* hip_from_nuade(NuadeSong* song) {

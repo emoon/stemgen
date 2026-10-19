@@ -1564,6 +1564,41 @@ int sc_get_num_samples(const ScModule* module) {
     return module ? module->module_data.num_samples : 0;
 }
 
+bool sc_sample_pcm(const ScModule* module, int n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                   uint32_t* loop_length) {
+    if (!module || n < 0 || n >= module->module_data.num_samples)
+        return false;
+    const ScSample* sample = &module->module_data.samples[n];
+    if (sample->sample_data == nullptr || sample->sample_data_length <= 0)
+        return false;
+    const uint32_t available = (uint32_t)sample->sample_data_length;
+    // the 3.x player loops only from a loop start above 0, the later ones from any loop end above the start
+    const bool loops = sample->loop_end > sample->loop_start
+                       && (module->module_type != SC_TYPE_3X || sample->loop_start != 0);
+    uint32_t end = sample->length;
+    *loop_start = 0;
+    *loop_length = 0;
+    if (loops) {
+        *loop_start = sample->loop_start;
+        *loop_length = (uint32_t)(sample->loop_end - sample->loop_start);
+        if (*loop_start + *loop_length > end)
+            end = *loop_start + *loop_length;
+    }
+    if (end > available)
+        end = available;
+    if (end == 0 || *loop_start >= end) {
+        *loop_start = 0;
+        *loop_length = 0;
+    } else if (*loop_start + *loop_length > end) {
+        *loop_length = end - *loop_start;
+    }
+    if (end == 0)
+        return false;
+    *data = sample->sample_data;
+    *length = end;
+    return true;
+}
+
 float sc_get_instrument_param(const ScModule* module, int inst, const char* param) {
     if (!module || inst < 0 || inst >= module->module_data.num_instruments || !param
         || !module->module_data.instruments)

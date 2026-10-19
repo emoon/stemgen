@@ -194,6 +194,14 @@ BthTickResult bth_tick(BthPlayer* player, NuadeVoices* voices);
 
 BthVoiceState bth_voice_state(const BthPlayer* player, int voice);
 
+// The instrument records of the module (the voice state numbers them by their place in the table), and the PCM of
+// one's sample as the module holds it, in bytes. A sample that loops gives the part played before the loop and the
+// loop. False for an empty record or a sample outside the module. A song's init may set the lengths of its
+// instruments; those are read as the file has them.
+uint32_t bth_sample_count(const BthPlayer* player);
+bool bth_sample_pcm(const BthPlayer* player, uint32_t index, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 BthPlayer* bth_from_nuade(NuadeSong* song);
 

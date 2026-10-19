@@ -121,6 +121,28 @@ static uint32_t soundmon_tracker_cells(void* user_data, const NuadePosition* at,
                               user_data);
 }
 
+static uint32_t soundmon_sample_count(void* user_data) {
+    (void)user_data;
+    return SOUNDMON_INSTRUMENTS;
+}
+
+static bool soundmon_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SmModule* module = (const SmModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sm_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = n,
+                           .name = sm_get_instrument_name(module, (int)n),
+                           .data = data,
+                           .frames = length,
+                           .bits = 8,
+                           .loop_start = loop_start,
+                           .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_soundmon = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "soundmon",
@@ -137,6 +159,8 @@ const NuadePlayer nuade_player_soundmon = {
     .voice_info = soundmon_voice_info,
     .tracker_info = soundmon_tracker_info,
     .tracker_cells = soundmon_tracker_cells,
+    .sample_count = soundmon_sample_count,
+    .sample_get = soundmon_sample_get,
 };
 
 SmModule* sm_from_nuade(NuadeSong* song) {

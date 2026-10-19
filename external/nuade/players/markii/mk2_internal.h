@@ -34,6 +34,8 @@ typedef struct Mk2Step {
     bool keep_dma; // bit 0 of the parameter: the DMA is not restarted
 } Mk2Step;
 
+#define MK2_INSTRUMENT_BYTES 8
+
 typedef struct Mk2Instrument {
     uint32_t offset; // from the sample start
     uint16_t length_words;

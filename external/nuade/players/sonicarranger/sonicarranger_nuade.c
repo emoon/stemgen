@@ -147,6 +147,28 @@ static uint32_t sonicarranger_tracker_cells(void* user_data, const NuadePosition
                               sonicarranger_cell, module);
 }
 
+static uint32_t sonicarranger_sample_count(void* user_data) {
+    return (uint32_t)sa_get_instrument_count((const SaModule*)user_data);
+}
+
+static bool sonicarranger_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SaModule* module = (const SaModule*)user_data;
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sa_instrument_pcm(module, (int)n, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    const char* name = sa_get_instrument_name(module, (int)n);
+    *out = (NuadeExportSample) { .index = n,
+                                 .name = name[0] != '\0' ? name : nullptr,
+                                 .data = data,
+                                 .frames = length,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_length };
+    return true;
+}
+
 const NuadePlayer nuade_player_sonicarranger = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "sonicarranger",
@@ -158,6 +180,8 @@ const NuadePlayer nuade_player_sonicarranger = {
     .close = sonicarranger_close,
     .start = sonicarranger_start,
     .tick = sonicarranger_tick,
+    .sample_count = sonicarranger_sample_count,
+    .sample_get = sonicarranger_sample_get,
     .metadata = sonicarranger_metadata,
     .position = sonicarranger_position,
     .voice_info = sonicarranger_voice_info,

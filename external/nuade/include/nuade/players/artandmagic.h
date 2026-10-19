@@ -111,6 +111,7 @@ struct AamPlayer {
     uint8_t* image; // the file as the driver sees memory after its init code: samples compacted. Padded with zeros
     size_t size;
     AamLayout layout;
+    uint32_t sample_count; // 8SVX forms the init code strung together
     AamVoice voices[AAM_VOICES];
     bool looped;
 };
@@ -127,6 +128,13 @@ bool aam_start(AamPlayer* player, NuadeVoices* voices);
 
 // Run one driver tick and hand the Paula registers it wrote to the voices.
 AamTickResult aam_tick(AamPlayer* player, NuadeVoices* voices);
+// The instruments of the driver's table (the voice state numbers them), and the PCM of an instrument's sample, in
+// bytes, as the driver's memory holds it after the init code. The first sample starts with the bytes the sample table
+// overwrites. False for an instrument whose sample has no data.
+int aam_instrument_count(const AamPlayer* player);
+bool aam_sample_pcm(const AamPlayer* player, int instrument, const int8_t** data, uint32_t* length,
+                    uint32_t* loop_start, uint32_t* loop_length);
+
 AamVoiceState aam_voice_state(const AamPlayer* player, int voice);
 
 // The player's state behind a song it opened; 0 when the song is another player's.

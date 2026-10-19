@@ -65,6 +65,23 @@ static uint32_t legglessmusiceditor_voice_info(void* user_data, NuadeVoiceInfo* 
     return n;
 }
 
+static uint32_t legglessmusiceditor_sample_count(void* user_data) {
+    return ((const LmePlayer*)user_data)->module.instrument_count;
+}
+
+static bool legglessmusiceditor_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const LmePlayer* player = (const LmePlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!lme_instrument_pcm(&player->module, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 static uint32_t legglessmusiceditor_grid_ticks(void* user_data, uint32_t subsong) {
     (void)subsong;
     return lme_grid_ticks((const LmePlayer*)user_data);
@@ -83,6 +100,8 @@ const NuadePlayer nuade_player_legglessmusiceditor = {
     .tick = legglessmusiceditor_tick,
     .metadata = legglessmusiceditor_metadata,
     .voice_info = legglessmusiceditor_voice_info,
+    .sample_count = legglessmusiceditor_sample_count,
+    .sample_get = legglessmusiceditor_sample_get,
     .grid_ticks = legglessmusiceditor_grid_ticks,
 };
 

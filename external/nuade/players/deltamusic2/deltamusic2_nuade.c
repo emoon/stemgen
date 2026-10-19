@@ -111,6 +111,24 @@ static uint32_t deltamusic2_tracker_cells(void* user_data, const NuadePosition* 
                               deltamusic2_cell, user_data);
 }
 
+// Entry n is instrument n + 1: the numbers of the module start at 1.
+static uint32_t deltamusic2_sample_count(void* user_data) {
+    (void)user_data;
+    return DM2_INSTRUMENTS;
+}
+
+static bool deltamusic2_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const uint8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!dm2_instrument_pcm((const Dm2Module*)user_data, (int)n + 1, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n + 1, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_deltamusic2 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "deltamusic2",
@@ -128,6 +146,8 @@ const NuadePlayer nuade_player_deltamusic2 = {
     .tracker_info = deltamusic2_tracker_info,
     .tracker_cells = deltamusic2_tracker_cells,
     .dump_state = deltamusic2_dump_state,
+    .sample_count = deltamusic2_sample_count,
+    .sample_get = deltamusic2_sample_get,
 };
 
 Dm2Module* dm2_from_nuade(NuadeSong* song) {

@@ -202,6 +202,10 @@ bool ma_voice_started(const MaModule* module, int voice, int* note, int* instrum
 
 int ma_sample_count(const MaModule* module);
 /* Sample name, "" when out of range. */
+// The sample an instrument plays as it is stored (8-bit data, the length and the repeat in bytes; a waveform loops
+// whole). False for an instrument without sample data.
+bool ma_instrument_pcm(const MaModule* module, int index, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                       uint32_t* loop_length);
 const char* ma_sample_name(const MaModule* module, int index);
 
 /* Track data access for pattern editing */

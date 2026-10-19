@@ -82,6 +82,23 @@ static uint32_t synthpack_grid_ticks(void* user_data, uint32_t subsong) {
     return sp_grid_ticks((const SpPlayer*)user_data);
 }
 
+static uint32_t synthpack_sample_count(void* user_data) {
+    return sp_instrument_count((const SpPlayer*)user_data);
+}
+
+static bool synthpack_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const SpPlayer* player = (const SpPlayer*)user_data;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!sp_instrument_pcm(player, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_synthpack = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "synthpack",
@@ -96,6 +113,8 @@ const NuadePlayer nuade_player_synthpack = {
     .metadata = synthpack_metadata,
     .voice_info = synthpack_voice_info,
     .grid_ticks = synthpack_grid_ticks,
+    .sample_count = synthpack_sample_count,
+    .sample_get = synthpack_sample_get,
 };
 
 SpPlayer* sp_from_nuade(NuadeSong* song) {

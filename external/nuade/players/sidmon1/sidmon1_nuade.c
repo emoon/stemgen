@@ -135,6 +135,22 @@ static uint32_t sidmon1_tracker_cells(void* user_data, const NuadePosition* at, 
                               sidmon1_cell, user_data);
 }
 
+static uint32_t sidmon1_sample_count(void* user_data) {
+    return (uint32_t)sd1_exportable_count((const Sd1Player*)user_data);
+}
+
+static bool sidmon1_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t length, loop_start, loop_length;
+    if (!sd1_instrument_pcm((const Sd1Player*)user_data, (int)n + 1, &data, &length, &loop_start, &loop_length)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = length, .bits = 8, .loop_start = loop_start, .loop_frames = loop_length
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_sidmon1 = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "sidmon1",
@@ -151,6 +167,8 @@ const NuadePlayer nuade_player_sidmon1 = {
     .voice_info = sidmon1_voice_info,
     .tracker_info = sidmon1_tracker_info,
     .tracker_cells = sidmon1_tracker_cells,
+    .sample_count = sidmon1_sample_count,
+    .sample_get = sidmon1_sample_get,
 };
 
 Sd1Player* sd1_from_nuade(NuadeSong* song) {

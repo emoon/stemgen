@@ -122,6 +122,23 @@ static uint32_t pumatracker_tracker_cells(void* user_data, const NuadePosition* 
                               user_data);
 }
 
+// Only the sample slots of the module: the built-in waveforms belong to the player and are the same in every song.
+static uint32_t pumatracker_sample_count(void* user_data) {
+    (void)user_data;
+    return PUMA_SAMPLE_COUNT;
+}
+
+static bool pumatracker_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    PumaSourcePcm pcm;
+    if (!puma_source_pcm((const PumaPlayer*)user_data, n, &pcm)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = pcm.data, .frames = pcm.frames, .bits = 8, .loop_frames = pcm.loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_pumatracker = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "pumatracker",
@@ -138,6 +155,8 @@ const NuadePlayer nuade_player_pumatracker = {
     .voice_info = pumatracker_voice_info,
     .tracker_info = pumatracker_tracker_info,
     .tracker_cells = pumatracker_tracker_cells,
+    .sample_count = pumatracker_sample_count,
+    .sample_get = pumatracker_sample_get,
 };
 
 PumaPlayer* puma_from_nuade(NuadeSong* song) {

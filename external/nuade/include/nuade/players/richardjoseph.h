@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 #define RJP_VOICES 4
+#define RJP_MAX_INSTRUMENTS 256 // an instrument number is a byte
 
 // The CIA clock: the timebase of RJP_TICK_LENGTH.
 #define RJP_TIMEBASE_HZ 709379
@@ -188,6 +189,20 @@ RjpTickResult rjp_tick(RjpPlayer* player, NuadeVoices* voices);
 uint32_t rjp_grid_ticks(void);
 
 RjpVoiceState rjp_voice_state(const RjpPlayer* player, uint32_t voice);
+
+// The instruments of the module (their numbers are 0-based record indexes).
+uint32_t rjp_instrument_count(const RjpPlayer* player);
+
+// The sample of instrument `n` as the sample file holds it (the driver clears the first word of the attack when it
+// plays a note; that is not applied here): the attack, which plays once, and the loop that follows. False when it is
+// outside the sample file.
+typedef struct RjpInstrumentPcm {
+    const int8_t* data;
+    uint32_t frames;
+    uint32_t loop_start;  // frames
+    uint32_t loop_frames; // 0 = no loop
+} RjpInstrumentPcm;
+bool rjp_instrument_pcm(const RjpPlayer* player, uint32_t n, RjpInstrumentPcm* out);
 
 // The player's state behind a song it opened; 0 when the song is another player's.
 RjpPlayer* rjp_from_nuade(NuadeSong* song);

@@ -602,6 +602,47 @@ const char* sbr_format_name(const SbrPlayer* player) {
     return player->module.build->name;
 }
 
+uint32_t sbr_instrument_count(const SbrPlayer* player) {
+    return player->module.instrument_count;
+}
+
+bool sbr_instrument_pcm(const SbrPlayer* player, uint32_t inst, const int8_t** data, uint32_t* frames,
+                        uint32_t* loop_start, uint32_t* loop_frames) {
+    const SbrModule* m = &player->module;
+    if (inst >= m->instrument_count) {
+        return false;
+    }
+    const SbrInstrument* in = &m->instruments[inst];
+    const int8_t* start = chip(player, in->offset);
+    if (start == nullptr || in->length_words == 0 || (in->offset & 1u) != 0) {
+        return false;
+    }
+    uint32_t length = (uint32_t)in->length_words * 2;
+    if (length > m->size - in->offset) {
+        length = (uint32_t)(m->size - in->offset);
+    }
+    *data = start;
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // The repeat belongs to the wave record that names the sample: the first one of the table with a repeat.
+    const uint32_t waves = (m->build->env - m->build->wave) / SBR_WAVE_BYTES;
+    for (uint32_t w = 0; w < waves && w * SBR_WAVE_BYTES <= 0xFF; w++) {
+        SbrWave wave;
+        if (!sbr_module_wave(m, (uint8_t)(w * SBR_WAVE_BYTES), &wave) || wave.instrument != inst) {
+            continue;
+        }
+        const uint32_t bytes
+            = m->build->loop_style == SbrLoop_VoiceZero ? (uint32_t)wave.loop_length * 2 : wave.loop_length;
+        if (bytes > 2 && wave.loop_start < length) {
+            *loop_start = wave.loop_start;
+            *loop_frames = bytes > length - wave.loop_start ? length - wave.loop_start : bytes;
+            break;
+        }
+    }
+    return true;
+}
+
 SbrVoiceState sbr_voice_state(const SbrPlayer* player, uint32_t voice) {
     const SbrVoice* c = &player->voices[voice];
     return (SbrVoiceState) { .period = c->shown_period, .instrument = c->shown_instrument };

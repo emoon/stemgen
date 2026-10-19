@@ -49,24 +49,34 @@ static void spl_nuade_metadata(void* user_data, const NuadeMetadataSink* sink) {
     sink->set_tag(sink->ctx, NUADE_META_FORMAT, "Sound Programming Language");
 }
 
-// The sound a voice plays is the sample of its instrument record: the sample's word offset in the module (a start the
-// record holds as an address, or relative to the build's sample base), or the sample number of the Table family.
-static int32_t spl_nuade_instrument(const SplPlayer* player, const SplRecord* record) {
-    const SplBuild* build = player->module->build;
-    if (build->family == SplFamily_Table) {
-        return (int32_t)record->sample_number;
-    }
-    const uint32_t offset = record->sample >= build->load_base ? record->sample - build->load_base : record->sample;
-    return (int32_t)(offset >> 1);
-}
-
 static uint32_t spl_nuade_voice_info(void* user_data, NuadeVoiceInfo* out, uint32_t cap) {
     const SplPlayer* player = (const SplPlayer*)user_data;
     const uint32_t count = cap < SPL_VOICES ? cap : SPL_VOICES;
     for (uint32_t i = 0; i < count; i++) {
-        out[i] = (NuadeVoiceInfo) { .note = -1, .instrument = spl_nuade_instrument(player, &player->voices[i].record) };
+        const int32_t sound = spl_record_sound_id(player->module->build, &player->voices[i].record);
+        out[i] = (NuadeVoiceInfo) { .note = -1, .instrument = sound };
     }
     return count;
+}
+
+static uint32_t spl_nuade_sample_count(void* user_data) {
+    return spl_sound_count((const SplPlayer*)user_data);
+}
+
+static bool spl_nuade_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    int32_t id;
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!spl_sound_pcm((const SplPlayer*)user_data, n, &id, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) { .index = (uint32_t)id,
+                                 .data = data,
+                                 .frames = frames,
+                                 .bits = 8,
+                                 .loop_start = loop_start,
+                                 .loop_frames = loop_frames };
+    return true;
 }
 
 const NuadePlayer nuade_player_spl = {
@@ -82,6 +92,8 @@ const NuadePlayer nuade_player_spl = {
     .tick = spl_nuade_tick,
     .metadata = spl_nuade_metadata,
     .voice_info = spl_nuade_voice_info,
+    .sample_count = spl_nuade_sample_count,
+    .sample_get = spl_nuade_sample_get,
 };
 
 SplPlayer* spl_from_nuade(NuadeSong* song) {

@@ -1128,10 +1128,13 @@ static void sf_find_samples_in_list(SfModule* m, SfScan* scan, uint32_t offset) 
             }
 
             case SF_OP_DEFINE_INSTR: {
-                offset++; // instrument number
+                const uint8_t number = sf_opcode_at(m, offset++);
                 uint16_t ilen = sf_fetch_word_at(m, &offset);
 
-                if (m->num_original_instruments < SF_MAX_INSTRUMENTS) {
+                // a definition several song lists reach is one instrument
+                if (m->num_original_instruments < SF_MAX_INSTRUMENTS
+                    && sf_find_original_instrument_index(m, offset) < 0) {
+                    m->original_instrument_numbers[m->num_original_instruments] = number;
                     m->original_instrument_offsets[m->num_original_instruments] = offset;
                     sf_parse_instrument_at(m, offset);
                     m->num_original_instruments++;
@@ -1456,6 +1459,33 @@ int sf_channel_count(const SfModule* module) {
 
 int sf_get_instrument_count(const SfModule* module) {
     return module ? module->num_original_instruments : 0;
+}
+
+bool sf_instrument_pcm(const SfModule* module, int n, uint32_t* number, const int8_t** data, uint32_t* frames,
+                       uint32_t* loop_start, uint32_t* loop_frames) {
+    if (!module || n < 0 || n >= module->num_original_instruments)
+        return false;
+    const SfInstrument* in = &module->original_instruments[n];
+    const uint32_t length = in->sample_length * 2U;
+    if (in->sample_data == nullptr || length == 0)
+        return false;
+    *number = module->original_instrument_numbers[n];
+    *data = in->sample_data;
+    *frames = length;
+    *loop_start = 0;
+    *loop_frames = 0;
+    // the same ranges the note start hands to the channel (see sf_new_note)
+    if (in->dasr_sustain_offset != 0) {
+        const uint32_t start = sf_min_u32(in->dasr_sustain_offset * 2U, length);
+        const uint32_t end = sf_min_u32(in->dasr_release_offset * 2U, length);
+        if (end > start) {
+            *loop_start = start;
+            *loop_frames = end - start;
+        }
+    } else if (!(in->effect_byte & SF_FLAG_ONE_SHOT)) {
+        *loop_frames = length;
+    }
+    return true;
 }
 
 float sf_get_instrument_param(const SfModule* module, int inst, const char* param) {

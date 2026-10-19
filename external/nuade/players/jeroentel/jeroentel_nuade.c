@@ -68,6 +68,22 @@ static uint32_t jeroentel_grid_ticks(void* user_data, uint32_t subsong) {
     return (uint32_t)jt_ticks_per_step((const JtPlayer*)user_data, (int)subsong);
 }
 
+static uint32_t jeroentel_sample_count(void* user_data) {
+    return jt_instrument_count((const JtPlayer*)user_data);
+}
+
+static bool jeroentel_sample_get(void* user_data, uint32_t n, NuadeExportSample* out) {
+    const int8_t* data;
+    uint32_t frames, loop_start, loop_frames;
+    if (!jt_instrument_pcm((const JtPlayer*)user_data, n, &data, &frames, &loop_start, &loop_frames)) {
+        return false;
+    }
+    *out = (NuadeExportSample) {
+        .index = n, .data = data, .frames = frames, .bits = 8, .loop_start = loop_start, .loop_frames = loop_frames
+    };
+    return true;
+}
+
 const NuadePlayer nuade_player_jeroentel = {
     .api_version = NUADE_PLAYER_API_VERSION,
     .id = "jeroentel",
@@ -82,6 +98,8 @@ const NuadePlayer nuade_player_jeroentel = {
     .metadata = jeroentel_metadata,
     .voice_info = jeroentel_voice_info,
     .grid_ticks = jeroentel_grid_ticks,
+    .sample_count = jeroentel_sample_count,
+    .sample_get = jeroentel_sample_get,
 };
 
 JtPlayer* jt_from_nuade(NuadeSong* song) {

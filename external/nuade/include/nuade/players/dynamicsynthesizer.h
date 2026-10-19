@@ -226,6 +226,14 @@ DnsTickResult dns_tick(DnsPlayer* player, NuadeVoices* voices);
 uint32_t dns_grid_ticks(const DnsPlayer* player, int subsong);
 DnsVoiceState dns_voice_state(const DnsPlayer* player, int voice);
 
+// The sample records of the module (the table has no end marker: it ends at the first record whose runs do not fit the
+// samples file) and the PCM of one, signed 8 bit, sizes in bytes. A sound is its first run plus its loop when the loop
+// lies in or directly after that run. False for a record without data. The first long of the samples is overwritten
+// by the replayer as it plays.
+uint32_t dns_sample_count(const DnsPlayer* player);
+bool dns_sample_pcm(const DnsPlayer* player, uint32_t n, const int8_t** data, uint32_t* length, uint32_t* loop_start,
+                    uint32_t* loop_length);
+
 // The player's state behind a song it opened; 0 when the song is another player's.
 DnsPlayer* dns_from_nuade(NuadeSong* song);
 

@@ -45,6 +45,9 @@ typedef struct E6Sample {
     uint32_t loop_length; // for a wavetable the size of one wave
 } E6Sample;
 
+#define E6_INSTRUMENT_LIMIT 64 // the sequencer masks the instrument number with 0x3F
+
+uint32_t e6_module_instrument_count(const Ems6Module* m);
 E6Sample e6_module_sample(const Ems6Module* m, uint32_t instrument);
 
 // The first wave of the instrument read as a wavetable, whatever it is.
